@@ -15,12 +15,7 @@
 //   - as frases exatas, gírias, exemplos específicos do negócio
 // =====================================================================
 
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { supabase } from "../services/supabase.js";
 
 export const STAGES = {
   FRIO: "frio",
@@ -57,7 +52,7 @@ export const POSTURE_BY_STAGE = {
  */
 export async function getOrCreateLead({ companyId, customerPhone }) {
   const { data: existingLead } = await supabase
-    .from("leads")
+    .from("tp_leads")
     .select("*")
     .eq("company_id", companyId)
     .eq("phone", customerPhone)
@@ -68,7 +63,7 @@ export async function getOrCreateLead({ companyId, customerPhone }) {
   }
 
   const { data: newLead, error } = await supabase
-    .from("leads")
+    .from("tp_leads")
     .insert({
       company_id: companyId,
       phone: customerPhone,
@@ -97,7 +92,7 @@ export async function registerInteraction({ companyId, customerPhone, rawMessage
     return;
   }
 
-  await supabase.from("lead_interactions").insert({
+  await supabase.from("tp_lead_interactions").insert({
     lead_id: lead.id,
     message: rawMessage,
   });
@@ -114,7 +109,7 @@ export async function registerInteraction({ companyId, customerPhone, rawMessage
  */
 export async function advanceStage({ leadId, newStage }) {
   const { error } = await supabase
-    .from("leads")
+    .from("tp_leads")
     .update({ stage: newStage })
     .eq("id", leadId);
 
@@ -147,10 +142,8 @@ export function podeExecutarAcao(stage, actionType) {
   const ACOES_DE_RISCO = ["enviar_preco", "enviar_link_pagamento", "fechar_proposta"];
 
   if (!ACOES_DE_RISCO.includes(actionType)) {
-    // Ação não é de risco, sempre permitida.
     return true;
   }
 
-  // Ações de risco só são permitidas para leads quentes.
   return stage === STAGES.QUENTE;
 }

@@ -1,18 +1,13 @@
 // =====================================================================
 // companies.js
-// Tudo relacionado à tabela "companies" no Supabase.
+// Tudo relacionado à tabela "tp_companies" no Supabase.
 //
 // Este arquivo é FIXO — a forma de buscar uma empresa é igual para
 // todos os clientes. O que muda (nome, telefone, business_type) são
 // só os DADOS guardados no banco, não a lógica aqui.
 // =====================================================================
 
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { supabase } from "./supabase.js";
 
 /**
  * Busca a empresa dona de um determinado phone_number_id
@@ -23,7 +18,7 @@ const supabase = createClient(
  */
 export async function getCompanyByPhoneNumberId(phoneNumberId) {
   const { data, error } = await supabase
-    .from("companies")
+    .from("tp_companies")
     .select("*")
     .eq("phone_number_id", phoneNumberId)
     .single();
@@ -46,7 +41,7 @@ export async function getCompanyByPhoneNumberId(phoneNumberId) {
  */
 export async function getCompanyById(companyId) {
   const { data, error } = await supabase
-    .from("companies")
+    .from("tp_companies")
     .select("*")
     .eq("id", companyId)
     .single();
