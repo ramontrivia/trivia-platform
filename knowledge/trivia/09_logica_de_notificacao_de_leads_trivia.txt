@@ -1,0 +1,91 @@
+============================================================
+TRÍVIA — LÓGICA DE NOTIFICAÇÃO DE LEAD
+============================================================
+
+[OBJETIVO]
+
+Quando a MEL identificar um lead quente,
+o sistema deve notificar o responsável comercial
+via WhatsApp em tempo real.
+
+Isso garante que nenhum lead quente esfrie
+por falta de resposta humana rápida.
+
+============================================================
+
+[DEFINIÇÃO DE LEAD QUENTE]
+
+Considerar lead quente quando o cliente:
+
+• Pergunta sobre preço ou planos.
+• Pergunta como começa ou como contrata.
+• Diz que quer para o negócio dele.
+• Pede para falar com alguém da equipe.
+• Demonstra urgência real.
+• Responde positivamente à Fase 5 (Validação).
+
+============================================================
+
+[RESPONSÁVEL COMERCIAL]
+
+Nome: Ramon
+WhatsApp de notificação: 5531996073905
+Formato: número com DDI+DDD sem espaços ou símbolos.
+
+============================================================
+
+[MODELO DE MENSAGEM DE NOTIFICAÇÃO]
+
+Quando lead quente identificado, enviar para 5531996073905:
+
+---
+🔥 *LEAD QUENTE — TRÍVIA*
+
+👤 Nome: [nome do cliente se informado]
+📱 WhatsApp: [número do cliente]
+🏢 Segmento: [segmento identificado na conversa]
+📍 Cidade: [cidade se informada]
+
+💬 Última mensagem:
+"[última mensagem do cliente]"
+
+⚡ Ação: Entre em contato agora.
+---
+
+============================================================
+
+[TIMING DA NOTIFICAÇÃO]
+
+Enviar notificação IMEDIATAMENTE ao identificar sinal de lead quente.
+Não esperar o fim da conversa.
+Não esperar confirmação do cliente.
+
+Notificar ANTES de passar o contato comercial para o cliente.
+Assim Ramon já estará preparado quando o cliente chegar.
+
+============================================================
+
+[COMPORTAMENTO DA MEL APÓS NOTIFICAÇÃO]
+
+1. Confirmar nome da empresa e cidade do cliente.
+2. Passar o contato comercial:
+   WhatsApp: (31) 99607-3905
+3. Informar que a equipe já foi avisada.
+4. Encerrar com leveza.
+
+Frase modelo:
+"Ótimo, [Nome]! Já deixei nossa equipe avisada com o seu caso.
+Você pode falar direto pelo WhatsApp: (31) 99607-3905
+Eles já vão saber quem você é e o que você precisa 😊"
+
+============================================================
+
+[REGRA DE SEGURANÇA]
+
+Nunca enviar notificação para número diferente de 5531996073905.
+Nunca inventar dados do cliente.
+Sempre usar apenas informações confirmadas na conversa.
+
+============================================================
+FIM DO DOCUMENTO
+============================================================
