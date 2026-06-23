@@ -32,36 +32,51 @@ export async function enviarRelatorioAdmin({ company, customerPhone, adminName }
   (servs || []).forEach((s) => { nomesServicos[s.id] = s.name; });
   (provs || []).forEach((p) => { nomesProviders[p.id] = p.name; });
 
-  const aguardando = todos.filter((a) => a.status === "aguardando_aprovacao");
-  const confirmados = todos.filter((a) => a.status === "confirmado");
+  // Separa apenas ativos (aguardando + confirmados)
+  const ativos = todos.filter((a) => a.status === "aguardando_aprovacao" || a.status === "confirmado");
   const cancelados = todos.filter((a) => a.status === "cancelado");
 
-  const formatar = (a) => {
-    const data = new Date(a.scheduled_at).toLocaleDateString("pt-BR");
-    const hora = new Date(a.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    const serv = nomesServicos[a.service_id] || "?";
+  // Agrupa ativos por data
+  const porData = {};
+  ativos.forEach((a) => {
+    const data = new Date(a.scheduled_at).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" });
+    if (!porData[data]) porData[data] = {};
     const prov = nomesProviders[a.provider_id] || "?";
-    const cliente = a.customer_name || a.customer_phone;
-    return "• " + cliente + " — " + serv + " c/ " + prov + " em " + data + " às " + hora;
-  };
+    if (!porData[data][prov]) porData[data][prov] = [];
+    porData[data][prov].push(a);
+  });
 
-  let relatorio = "📋 *PAINEL ESPAÇO CHANNEL*\nOlá, " + adminName + "!\n\n";
+  let relatorio = "📋 *AGENDA ESPAÇO CHANNEL*\n";
+  relatorio += "Olá, " + adminName + "!\n";
+  relatorio += "─────────────────────\n\n";
 
-  relatorio += "⏳ *AGUARDANDO CONFIRMAÇÃO (" + aguardando.length + ")*\n";
-  relatorio += aguardando.length > 0 ? aguardando.map(formatar).join("\n") : "Nenhum.";
-  relatorio += "\n\n";
+  if (Object.keys(porData).length === 0) {
+    relatorio += "Nenhum agendamento ativo no momento.\n\n";
+  } else {
+    for (const data of Object.keys(porData)) {
+      relatorio += "📅 *" + data.toUpperCase() + "*\n";
+      for (const prov of Object.keys(porData[data])) {
+        relatorio += "  💅 " + prov + "\n";
+        for (const a of porData[data][prov]) {
+          const hora = new Date(a.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+          const serv = nomesServicos[a.service_id] || "?";
+          const cliente = a.customer_name || a.customer_phone;
+          const status = a.status === "confirmado" ? "✅" : "⏳";
+          relatorio += "    " + status + " " + hora + " — " + cliente + " (" + serv + ")\n";
+        }
+      }
+      relatorio += "\n";
+    }
+  }
 
-  relatorio += "✅ *CONFIRMADOS (" + confirmados.length + ")*\n";
-  relatorio += confirmados.length > 0 ? confirmados.map(formatar).join("\n") : "Nenhum.";
-  relatorio += "\n\n";
-
-  relatorio += "❌ *CANCELADOS (" + cancelados.length + ")*\n";
-  relatorio += cancelados.length > 0 ? cancelados.map(formatar).join("\n") : "Nenhum.";
-  relatorio += "\n\n";
-
+  relatorio += "─────────────────────\n";
   relatorio += "📊 *RESUMO*\n";
-  relatorio += "Total: " + todos.length + " agendamentos\n";
-  relatorio += "Aguardando: " + aguardando.length + " | Confirmados: " + confirmados.length + " | Cancelados: " + cancelados.length;
+  const aguardando = ativos.filter((a) => a.status === "aguardando_aprovacao");
+  const confirmados = ativos.filter((a) => a.status === "confirmado");
+  relatorio += "⏳ Aguardando: " + aguardando.length + "\n";
+  relatorio += "✅ Confirmados: " + confirmados.length + "\n";
+  relatorio += "❌ Cancelados: " + cancelados.length + "\n";
+  relatorio += "Total geral: " + todos.length;
 
   await sendTextMessage({ to: customerPhone, message: relatorio, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
 }
