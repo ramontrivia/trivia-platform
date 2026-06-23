@@ -1,7 +1,23 @@
 ﻿import { supabase } from "../services/supabase.js";
 
+function limparNome(name) {
+  return name
+    .replace(/meu nome é/gi, "")
+    .replace(/pode me chamar de/gi, "")
+    .replace(/me chamo/gi, "")
+    .replace(/sou o/gi, "")
+    .replace(/sou a/gi, "")
+    .replace(/é o/gi, "")
+    .replace(/é a/gi, "")
+    .trim()
+    .split(" ")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export async function salvarNomeCliente({ leadId, name }) {
-  await supabase.from("tp_leads").update({ name }).eq("id", leadId);
+  const nomeLimpo = limparNome(name);
+  await supabase.from("tp_leads").update({ name: nomeLimpo }).eq("id", leadId);
 }
 
 export async function montarMemoriaCliente({ companyId, customerPhone, leadId }) {
