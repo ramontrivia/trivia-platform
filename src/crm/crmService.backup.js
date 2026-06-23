@@ -107,14 +107,15 @@ export async function registerInteraction({ companyId, customerPhone, rawMessage
  * Move o lead para um novo estÃ¡gio (chamado pelos funnels quando algo
  * importante acontece â€” ex: cliente confirmou um agendamento).
  */
-export async function advanceStage({ companyId, customerPhone }) {
-  const lead = await getOrCreateLead({ companyId, customerPhone });
-  if (!lead) return;
-  const stages = [STAGES.FRIO, STAGES.MORNO, STAGES.QUENTE];
-  const currentIndex = stages.indexOf(lead.stage);
-  const nextStage = stages[Math.min(currentIndex + 1, stages.length - 1)];
-  const { error } = await supabase.from("tp_leads").update({ stage: nextStage }).eq("id", lead.id);
-  if (error) console.error("Erro ao avancar estagio do lead:", error.message);
+export async function advanceStage({ leadId, newStage }) {
+  const { error } = await supabase
+    .from("tp_leads")
+    .update({ stage: newStage })
+    .eq("id", leadId);
+
+  if (error) {
+    console.error("Erro ao avanÃ§ar estÃ¡gio do lead:", error.message);
+  }
 }
 
 /**
