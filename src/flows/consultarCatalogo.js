@@ -1,11 +1,12 @@
 ﻿import { supabase } from "../services/supabase.js";
 
-// Lista os servicos da empresa, agrupados de forma legivel
+// Lista os servicos da empresa, excluindo terceirizados
 export async function listarServicos(companyId) {
   const { data: services } = await supabase
     .from("tp_services")
     .select("name")
     .eq("company_id", companyId)
+    .eq("terceirizado", false)
     .order("name");
   if (!services || services.length === 0) return [];
   return services.map((s) => s.name);

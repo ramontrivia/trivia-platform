@@ -1,23 +1,6 @@
-// =====================================================================
-// identificarIntencao.js
-// Descobre qual serviço o cliente quer, a partir da fala natural dele.
-// Também checa se esse serviço tem prestador cadastrado (se não tiver,
-// é um serviço de parceiro, e precisa ser direcionado para o
-// telefone administrativo/comercial).
-// =====================================================================
-
 import { supabase } from "../services/supabase.js";
 import { generateResponse } from "../services/openai.js";
 
-/**
- * Tenta identificar qual serviço (da tabela tp_services) o cliente
- * está pedindo, a partir do texto da mensagem.
- *
- * @param {object} params
- * @param {number} params.companyId
- * @param {string} params.customerMessage - o texto que o cliente mandou
- * @returns {object|null} { service, hasProvider } ou null se não identificou nada
- */
 export async function identificarServico({ companyId, customerMessage }) {
   const { data: services, error } = await supabase
     .from("tp_services")
@@ -29,7 +12,6 @@ export async function identificarServico({ companyId, customerMessage }) {
     return null;
   }
 
-  // Monta a lista de serviços para a IA escolher entre eles
   const listaServicos = services.map((s) => `- ${s.name} (id: ${s.id})`).join("\n");
 
   const prompt = `
@@ -62,6 +44,11 @@ exatamente: nenhum
     return null;
   }
 
+  // Verifica se é serviço terceirizado
+  if (service.terceirizado) {
+    return { service, hasProvider: false, terceirizado: true };
+  }
+
   // Checa se existe algum prestador vinculado a esse serviço
   const { data: vinculos } = await supabase
     .from("tp_provider_services")
@@ -70,5 +57,5 @@ exatamente: nenhum
 
   const hasProvider = vinculos && vinculos.length > 0;
 
-  return { service, hasProvider };
+  return { service, hasProvider, terceirizado: false };
 }

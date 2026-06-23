@@ -11,6 +11,7 @@ export async function classificarIntencao(customerMessage) {
     "- listar_profissionais: o cliente quer saber QUAIS profissionais existem",
     "- agendar: o cliente quer marcar ou fazer um servico especifico",
     "- cancelar: o cliente quer cancelar um ou mais agendamentos",
+    "- humano: o cliente quer falar com uma pessoa, atendente humano, ou tirar duvida complexa",
     "- conversar: saudacao, agradecimento, duvida geral ou qualquer outra coisa",
     "",
     "Responda APENAS com o nome da categoria, sem explicacao. Exemplo: agendar",
@@ -23,6 +24,6 @@ export async function classificarIntencao(customerMessage) {
 
   if (!resposta) return "conversar";
   const intencao = resposta.trim().toLowerCase();
-  const validas = ["listar_servicos", "listar_profissionais", "agendar", "cancelar", "conversar"];
+  const validas = ["listar_servicos", "listar_profissionais", "agendar", "cancelar", "humano", "conversar"];
   return validas.includes(intencao) ? intencao : "conversar";
 }
