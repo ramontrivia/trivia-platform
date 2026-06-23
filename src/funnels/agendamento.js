@@ -162,6 +162,18 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   await criarAgendamento({ company, provider: { id: escolha.providerId, name: escolha.providerName, phone: null }, service: { id: serviceId, name: serviceName }, scheduledAt: new Date(escolha.horarioISO), customerPhone, customerName });
   await advanceStage({ companyId: company.id, customerPhone });
 
+  // Notifica a profissional
+  const { data: providerData } = await supabase
+    .from("tp_providers")
+    .select("phone")
+    .eq("id", escolha.providerId)
+    .single();
+
+  if (providerData?.phone) {
+    const msgProfissional = `Olá ${escolha.providerName}! Você tem um novo agendamento: ${serviceName} com ${customerName || customerPhone} em ${estado.context.diaLabel} às ${escolha.horario}. Confirma? Responda SIM ou NÃO.`;
+    await sendTextMessage({ to: providerData.phone, message: msgProfissional, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+  }
+
   const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente " + (customerName || "") + " confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + estado.context.diaLabel + ". Confirme de forma calorosa, sem cumprimento inicial, sem emoji excessivo, informando que avisara quando a profissional confirmar." }] });
   await sendTextMessage({ to: customerPhone, message: confirmacao, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await clearConversationState({ companyId: company.id, customerPhone });
