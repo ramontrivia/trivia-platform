@@ -122,7 +122,6 @@ export async function handleMessage({ company, incomingMessage }) {
 }
 
 async function processarRespostaProfissional({ company, customerPhone, provider, resposta }) {
-  // Busca o agendamento mais recente aguardando confirmação desta profissional
   const { data: agendamento } = await supabase
     .from("tp_appointments")
     .select("id, customer_phone, customer_name, service_id, scheduled_at")
@@ -145,23 +144,12 @@ async function processarRespostaProfissional({ company, customerPhone, provider,
   const hora = new Date(agendamento.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
   if (resposta.startsWith("SIM")) {
-    // Confirma no banco
     await supabase.from("tp_appointments").update({ status: "confirmado" }).eq("id", agendamento.id);
-
-    // Avisa a profissional
     await sendTextMessage({ to: customerPhone, message: "Ótimo, " + provider.name + "! Agendamento confirmado ✅\n" + nomeServico + " com " + cliente + " em " + data + " às " + hora + ".", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-
-    // Avisa o cliente
     await sendTextMessage({ to: agendamento.customer_phone, message: "Boa notícia! " + provider.name + " confirmou seu agendamento de " + nomeServico + " para " + data + " às " + hora + ". Te esperamos! 🎉", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-
   } else {
-    // Cancela no banco
     await supabase.from("tp_appointments").update({ status: "cancelado" }).eq("id", agendamento.id);
-
-    // Avisa a profissional
     await sendTextMessage({ to: customerPhone, message: "Entendido, " + provider.name + ". Agendamento cancelado.", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-
-    // Avisa o cliente
     await sendTextMessage({ to: agendamento.customer_phone, message: "Olá! Infelizmente " + provider.name + " não poderá atender seu agendamento de " + nomeServico + " em " + data + " às " + hora + ". Entre em contato para remarcar. 💙", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   }
 }
@@ -208,7 +196,7 @@ async function processarEscolhaDia({ company, customerPhone, customerMessage, es
   }
 
   const listaHorarios = horarios.map((h) => h.horario + ": " + h.profissionais.map((p) => p.name).join(", ")).join("\n");
-  const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente escolheu " + diaEscolhido.label + " para " + serviceName + ". Mostre os horarios livres de forma natural, sem markdown:\n" + listaHorarios + "\nPergunte qual horario e profissional ele prefere." }] });
+  const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente escolheu " + diaEscolhido.label + " para " + serviceName + ". Mostre os horarios livres de forma natural, sem markdown:\n" + listaHorarios + "\nPergunte qual horario e profissional ele prefere. Deixe claro que ele deve informar TANTO o horario QUANTO a profissional." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: { serviceId, serviceName, diaLabel: diaEscolhido.label, horarios: horarios.map((h) => ({ horario: h.horario, horarioISO: h.horarioISO, profissionais: h.profissionais })) } });
 }
@@ -218,11 +206,11 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   const opcoesPlanas = [];
   horarios.forEach((h) => { h.profissionais.forEach((p) => { opcoesPlanas.push({ horario: h.horario, horarioISO: h.horarioISO, providerId: p.id, providerName: p.name }); }); });
   const listaOpcoes = opcoesPlanas.map((o, i) => i + ": " + o.horario + " com " + o.providerName).join("\n");
-  const prompt = "Opcoes disponiveis:\n" + listaOpcoes + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nIdentifique o indice da opcao escolhida. Responda APENAS o numero. Se escolheu so horario sem profissional, escolha o primeiro indice daquele horario. Se nao identificar: nenhum";
-  const resposta = await generateResponse({ systemPrompt: "Voce e um classificador preciso. Responda apenas o numero.", conversationHistory: [{ role: "user", content: prompt }] });
+  const prompt = "Opcoes disponiveis:\n" + listaOpcoes + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nIdentifique o indice da opcao escolhida. O cliente DEVE informar um horario especifico. Se informou apenas o nome da profissional SEM horario, responda: nenhum. Se informou horario com ou sem profissional, escolha o indice correspondente (se nao informou profissional, escolha o primeiro indice daquele horario). Responda APENAS o numero ou nenhum.";
+  const resposta = await generateResponse({ systemPrompt: "Voce e um classificador preciso. Responda apenas o numero ou nenhum.", conversationHistory: [{ role: "user", content: prompt }] });
 
   if (!resposta || resposta.trim().toLowerCase() === "nenhum") {
-    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente disse \"" + customerMessage + "\" mas nao ficou claro a escolha. Peca gentilmente que confirme horario e profissional." }] });
+    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente disse \"" + customerMessage + "\" mas nao informou o horario desejado. Peca gentilmente que informe o horario especifico que deseja." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     return;
   }
