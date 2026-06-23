@@ -12,16 +12,14 @@ export async function isAdmin({ companyId, customerPhone }) {
 }
 
 export async function isProvider({ companyId, customerPhone }) {
-  console.log("🔍 isProvider buscando phone:", customerPhone);
   const { data, error } = await supabase
     .from("tp_providers")
     .select("id, name, company_id")
     .eq("phone", customerPhone)
-    .single();
-  console.log("🔍 isProvider resultado:", data, "erro:", error?.message);
-  if (!data) return null;
-  if (data.company_id !== companyId) return null;
-  return data;
+    .eq("company_id", companyId)
+    .limit(1);
+  if (!data || data.length === 0) return null;
+  return data[0];
 }
 
 export async function enviarAgendaProfissional({ company, customerPhone, provider }) {
