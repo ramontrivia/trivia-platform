@@ -19,9 +19,10 @@ const STEP_ESCOLHER_HORARIO = "agendamento_escolher_horario";
 export async function handleMessage({ company, incomingMessage }) {
   const customerPhone = incomingMessage.from;
   const customerMessage = incomingMessage.text;
+  const msgUpper = customerMessage.trim().toUpperCase();
 
   // Comando ADM — painel da gerência
-  if (customerMessage.trim().toUpperCase() === "ADM") {
+  if (msgUpper === "ADM") {
     const admin = await isAdmin({ companyId: company.id, customerPhone });
     if (admin) {
       await enviarRelatorioAdmin({ company, customerPhone, adminName: admin.name });
@@ -30,10 +31,19 @@ export async function handleMessage({ company, incomingMessage }) {
   }
 
   // Comando AGENDA — agenda da profissional
-  if (customerMessage.trim().toUpperCase() === "AGENDA") {
+  if (msgUpper === "AGENDA") {
     const provider = await isProvider({ companyId: company.id, customerPhone });
     if (provider) {
       await enviarAgendaProfissional({ company, customerPhone, provider });
+      return;
+    }
+  }
+
+  // Resposta SIM/NÃO de profissional confirmando agendamento
+  if (msgUpper === "SIM" || msgUpper === "NAO" || msgUpper === "NÃO" || msgUpper === "NAO." || msgUpper === "SIM.") {
+    const provider = await isProvider({ companyId: company.id, customerPhone });
+    if (provider) {
+      await processarRespostaProfissional({ company, customerPhone, provider, resposta: msgUpper });
       return;
     }
   }
@@ -108,6 +118,51 @@ export async function handleMessage({ company, incomingMessage }) {
     const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente quer agendar " + service.name + ". Antes de mostrar os horarios, peca o nome dele de forma natural e acolhedora." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     await setConversationState({ companyId: company.id, customerPhone, step: STEP_COLETAR_NOME, context: { serviceId: service.id, serviceName: service.name } });
+  }
+}
+
+async function processarRespostaProfissional({ company, customerPhone, provider, resposta }) {
+  // Busca o agendamento mais recente aguardando confirmação desta profissional
+  const { data: agendamento } = await supabase
+    .from("tp_appointments")
+    .select("id, customer_phone, customer_name, service_id, scheduled_at")
+    .eq("company_id", company.id)
+    .eq("provider_id", provider.id)
+    .eq("status", "aguardando_aprovacao")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!agendamento) {
+    await sendTextMessage({ to: customerPhone, message: "Olá " + provider.name + "! Não encontrei nenhum agendamento pendente para você confirmar.", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+    return;
+  }
+
+  const { data: servico } = await supabase.from("tp_services").select("name").eq("id", agendamento.service_id).single();
+  const nomeServico = servico?.name || "serviço";
+  const cliente = agendamento.customer_name || agendamento.customer_phone;
+  const data = new Date(agendamento.scheduled_at).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" });
+  const hora = new Date(agendamento.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  if (resposta.startsWith("SIM")) {
+    // Confirma no banco
+    await supabase.from("tp_appointments").update({ status: "confirmado" }).eq("id", agendamento.id);
+
+    // Avisa a profissional
+    await sendTextMessage({ to: customerPhone, message: "Ótimo, " + provider.name + "! Agendamento confirmado ✅\n" + nomeServico + " com " + cliente + " em " + data + " às " + hora + ".", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+
+    // Avisa o cliente
+    await sendTextMessage({ to: agendamento.customer_phone, message: "Boa notícia! " + provider.name + " confirmou seu agendamento de " + nomeServico + " para " + data + " às " + hora + ". Te esperamos! 🎉", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+
+  } else {
+    // Cancela no banco
+    await supabase.from("tp_appointments").update({ status: "cancelado" }).eq("id", agendamento.id);
+
+    // Avisa a profissional
+    await sendTextMessage({ to: customerPhone, message: "Entendido, " + provider.name + ". Agendamento cancelado.", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+
+    // Avisa o cliente
+    await sendTextMessage({ to: agendamento.customer_phone, message: "Olá! Infelizmente " + provider.name + " não poderá atender seu agendamento de " + nomeServico + " em " + data + " às " + hora + ". Entre em contato para remarcar. 💙", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   }
 }
 
@@ -189,7 +244,7 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
     .single();
 
   if (providerData?.phone) {
-    const msgProfissional = `Olá ${escolha.providerName}! Você tem um novo agendamento: ${serviceName} com ${customerName || customerPhone} em ${estado.context.diaLabel} às ${escolha.horario}. Confirma? Responda SIM ou NÃO.`;
+    const msgProfissional = "Olá " + escolha.providerName + "! Você tem um novo agendamento: " + serviceName + " com " + (customerName || customerPhone) + " em " + estado.context.diaLabel + " às " + escolha.horario + ". Confirma? Responda SIM ou NÃO.";
     await sendTextMessage({ to: providerData.phone, message: msgProfissional, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   }
 
