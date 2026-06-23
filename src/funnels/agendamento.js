@@ -8,6 +8,7 @@ import { listarProximosDias, horariosDoDia } from "../flows/disponibilidadeDia.j
 import { criarAgendamento } from "../flows/criarAgendamento.js";
 import { getConversationState, setConversationState, clearConversationState } from "../flows/conversationState.js";
 import { getOrCreateLead, advanceStage } from "../crm/crmService.js";
+import { montarMemoriaCliente } from "../flows/memoriaCliente.js";
 
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
 const STEP_ESCOLHER_HORARIO = "agendamento_escolher_horario";
@@ -19,22 +20,20 @@ export async function handleMessage({ company, incomingMessage }) {
   const knowledge = loadKnowledge(company.client_key);
   const phase = lead?.stage || "frio";
   const phaseKnowledge = loadKnowledgePhase(company.client_key, phase);
-  const systemPrompt = [knowledge, phaseKnowledge].filter(Boolean).join("\n\n");
+  const memoria = await montarMemoriaCliente({ companyId: company.id, customerPhone, leadId: lead?.id });
+  const systemPrompt = [knowledge, phaseKnowledge, memoria].filter(Boolean).join("\n\n");
   const estado = await getConversationState({ companyId: company.id, customerPhone });
 
-  // ETAPA: cliente esta escolhendo o DIA
   if (estado && estado.step === STEP_ESCOLHER_DIA) {
     await processarEscolhaDia({ company, customerPhone, customerMessage, estado, systemPrompt });
     return;
   }
 
-  // ETAPA: cliente esta escolhendo HORARIO + PROFISSIONAL
   if (estado && estado.step === STEP_ESCOLHER_HORARIO) {
     await processarEscolhaHorario({ company, customerPhone, customerMessage, estado, systemPrompt });
     return;
   }
 
-  // CLASSIFICA a intencao
   const intencao = await classificarIntencao(customerMessage);
 
   if (intencao === "listar_servicos") {
@@ -56,7 +55,6 @@ export async function handleMessage({ company, incomingMessage }) {
     return;
   }
 
-  // intencao === agendar
   const identificacao = await identificarServico({ companyId: company.id, customerMessage });
   if (!identificacao) {
     const servicos = await listarServicos(company.id);
@@ -72,8 +70,6 @@ export async function handleMessage({ company, incomingMessage }) {
   }
 
   if (phase === "frio") await advanceStage({ companyId: company.id, customerPhone });
-
-  // Mostra os proximos dias e pede pro cliente escolher
   await mostrarDias({ company, customerPhone, service, systemPrompt });
 }
 
@@ -92,7 +88,7 @@ async function processarEscolhaDia({ company, customerPhone, customerMessage, es
   const resposta = await generateResponse({ systemPrompt: "Voce e um classificador preciso. Responda apenas o numero.", conversationHistory: [{ role: "user", content: prompt }] });
 
   if (!resposta || resposta.trim().toLowerCase() === "nenhum") {
-    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente disse \"" + customerMessage + "\" mas nao ficou claro qual dia. Peca gentilmente que escolha um dos dias oferecidos." }] });
+    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente disse \"" + customerMessage + "\" mas nao ficou claro qual dia ele escolheu. Peca gentilmente que escolha um dos dias oferecidos." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     return;
   }
@@ -111,9 +107,8 @@ async function processarEscolhaDia({ company, customerPhone, customerMessage, es
   }
 
   const listaHorarios = horarios.map((h) => h.horario + ": " + h.profissionais.map((p) => p.name).join(", ")).join("\n");
-  const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente escolheu " + diaEscolhido.label + " para " + serviceName + ". Apresente os horarios livres do dia de forma natural, sem markdown, sem tracos, mostrando cada horario com as profissionais disponiveis:\n" + listaHorarios + "\nPergunte qual horario e qual profissional ele prefere." }] });
+  const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente escolheu " + diaEscolhido.label + " para " + serviceName + ". Apresente os horarios livres de forma natural, sem markdown, mostrando cada horario com as profissionais disponiveis:\n" + listaHorarios + "\nPergunte qual horario e qual profissional ele prefere." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-
   await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: { serviceId, serviceName, diaLabel: diaEscolhido.label, horarios: horarios.map((h) => ({ horario: h.horario, horarioISO: h.horarioISO, profissionais: h.profissionais })) } });
 }
 
@@ -122,11 +117,11 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   const opcoesPlanas = [];
   horarios.forEach((h) => { h.profissionais.forEach((p) => { opcoesPlanas.push({ horario: h.horario, horarioISO: h.horarioISO, providerId: p.id, providerName: p.name }); }); });
   const listaOpcoes = opcoesPlanas.map((o, i) => i + ": " + o.horario + " com " + o.providerName).join("\n");
-  const prompt = "Opcoes disponiveis:\n" + listaOpcoes + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nIdentifique o indice da opcao escolhida (horario + profissional). Responda APENAS o numero. Se o cliente escolheu so o horario sem profissional, escolha o primeiro indice daquele horario. Se nao identificar: nenhum";
+  const prompt = "Opcoes disponiveis:\n" + listaOpcoes + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nIdentifique o indice da opcao escolhida. Responda APENAS o numero. Se o cliente escolheu so o horario sem profissional, escolha o primeiro indice daquele horario. Se nao identificar: nenhum";
   const resposta = await generateResponse({ systemPrompt: "Voce e um classificador preciso. Responda apenas o numero.", conversationHistory: [{ role: "user", content: prompt }] });
 
   if (!resposta || resposta.trim().toLowerCase() === "nenhum") {
-    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente disse \"" + customerMessage + "\" mas nao ficou claro o horario e a profissional. Peca gentilmente que confirme." }] });
+    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente disse \"" + customerMessage + "\" mas nao ficou claro o horario e a profissional. Peca gentilmente que confirme a escolha." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     return;
   }
@@ -140,7 +135,7 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   await criarAgendamento({ company, provider: { id: escolha.providerId, name: escolha.providerName, phone: null }, service: { id: serviceId, name: serviceName }, scheduledAt: new Date(escolha.horarioISO), customerPhone });
   await advanceStage({ companyId: company.id, customerPhone });
 
-  const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + estado.context.diaLabel + ". Confirme de forma calorosa, sem emoji, informando que avisara quando a profissional confirmar." }] });
+  const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + estado.context.diaLabel + ". Confirme de forma calorosa, sem emoji excessivo, informando que avisara quando a profissional confirmar." }] });
   await sendTextMessage({ to: customerPhone, message: confirmacao, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await clearConversationState({ companyId: company.id, customerPhone });
 }
