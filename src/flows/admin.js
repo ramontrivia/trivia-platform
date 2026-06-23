@@ -1,9 +1,3 @@
-// =====================================================================
-// admin.js
-// Painel administrativo via WhatsApp.
-// Quando um admin manda "ADM", recebe um relatório completo do salão.
-// =====================================================================
-
 import { supabase } from "../services/supabase.js";
 import { sendTextMessage } from "../services/whatsapp.js";
 
@@ -18,11 +12,6 @@ export async function isAdmin({ companyId, customerPhone }) {
 }
 
 export async function enviarRelatorioAdmin({ company, customerPhone, adminName }) {
-  const hoje = new Date();
-  const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).toISOString();
-  const fimHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59).toISOString();
-
-  // Busca todos os agendamentos
   const { data: todos } = await supabase
     .from("tp_appointments")
     .select("id, scheduled_at, status, customer_phone, customer_name, service_id, provider_id")
@@ -34,7 +23,6 @@ export async function enviarRelatorioAdmin({ company, customerPhone, adminName }
     return;
   }
 
-  // Busca nomes de serviços e profissionais
   const servIds = [...new Set(todos.map((a) => a.service_id))];
   const provIds = [...new Set(todos.map((a) => a.provider_id))];
   const { data: servs } = await supabase.from("tp_services").select("id, name").in("id", servIds);
@@ -44,5 +32,36 @@ export async function enviarRelatorioAdmin({ company, customerPhone, adminName }
   (servs || []).forEach((s) => { nomesServicos[s.id] = s.name; });
   (provs || []).forEach((p) => { nomesProviders[p.id] = p.name; });
 
-  // Separa por status
-  const aguardando = todos.filter((a) =>
+  const aguardando = todos.filter((a) => a.status === "aguardando_aprovacao");
+  const confirmados = todos.filter((a) => a.status === "confirmado");
+  const cancelados = todos.filter((a) => a.status === "cancelado");
+
+  const formatar = (a) => {
+    const data = new Date(a.scheduled_at).toLocaleDateString("pt-BR");
+    const hora = new Date(a.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const serv = nomesServicos[a.service_id] || "?";
+    const prov = nomesProviders[a.provider_id] || "?";
+    const cliente = a.customer_name || a.customer_phone;
+    return "• " + cliente + " — " + serv + " c/ " + prov + " em " + data + " às " + hora;
+  };
+
+  let relatorio = "📋 *PAINEL ESPAÇO CHANNEL*\nOlá, " + adminName + "!\n\n";
+
+  relatorio += "⏳ *AGUARDANDO CONFIRMAÇÃO (" + aguardando.length + ")*\n";
+  relatorio += aguardando.length > 0 ? aguardando.map(formatar).join("\n") : "Nenhum.";
+  relatorio += "\n\n";
+
+  relatorio += "✅ *CONFIRMADOS (" + confirmados.length + ")*\n";
+  relatorio += confirmados.length > 0 ? confirmados.map(formatar).join("\n") : "Nenhum.";
+  relatorio += "\n\n";
+
+  relatorio += "❌ *CANCELADOS (" + cancelados.length + ")*\n";
+  relatorio += cancelados.length > 0 ? cancelados.map(formatar).join("\n") : "Nenhum.";
+  relatorio += "\n\n";
+
+  relatorio += "📊 *RESUMO*\n";
+  relatorio += "Total: " + todos.length + " agendamentos\n";
+  relatorio += "Aguardando: " + aguardando.length + " | Confirmados: " + confirmados.length + " | Cancelados: " + cancelados.length;
+
+  await sendTextMessage({ to: customerPhone, message: relatorio, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+}
