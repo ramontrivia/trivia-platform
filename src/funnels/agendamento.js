@@ -21,6 +21,8 @@ export async function handleMessage({ company, incomingMessage }) {
   const customerMessage = incomingMessage.text;
   const msgUpper = customerMessage.trim().toUpperCase();
 
+  console.log("📞 DE:", customerPhone, "| MSG:", customerMessage);
+
   // Comando ADM — painel da gerência
   if (msgUpper === "ADM") {
     const admin = await isAdmin({ companyId: company.id, customerPhone });
@@ -33,6 +35,7 @@ export async function handleMessage({ company, incomingMessage }) {
   // Comando AGENDA — agenda da profissional
   if (msgUpper === "AGENDA") {
     const provider = await isProvider({ companyId: company.id, customerPhone });
+    console.log("🔍 AGENDA detectado de:", customerPhone, "| Provider:", provider);
     if (provider) {
       await enviarAgendaProfissional({ company, customerPhone, provider });
       return;
@@ -40,8 +43,9 @@ export async function handleMessage({ company, incomingMessage }) {
   }
 
   // Resposta SIM/NÃO de profissional confirmando agendamento
-  if (msgUpper.includes("SIM") || msgUpper.includes("NAO") || msgUpper.includes("NÃO") || msgUpper.includes("NÃO")) {
+  if (msgUpper.includes("SIM") || msgUpper.includes("NAO") || msgUpper.includes("NÃO")) {
     const provider = await isProvider({ companyId: company.id, customerPhone });
+    console.log("🔍 SIM/NAO detectado de:", customerPhone, "| Provider:", provider);
     if (provider) {
       await processarRespostaProfissional({ company, customerPhone, provider, resposta: msgUpper });
       return;
