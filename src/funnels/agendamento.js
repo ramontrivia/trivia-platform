@@ -1,5 +1,4 @@
-﻿@'
-import { generateResponse } from "../services/openai.js";
+﻿import { generateResponse } from "../services/openai.js";
 import { sendTextMessage } from "../services/whatsapp.js";
 import { loadKnowledge, loadKnowledgePhase } from "../services/knowledge.js";
 import { identificarServico } from "../flows/identificarIntencao.js";
@@ -30,12 +29,10 @@ export async function handleMessage({ company, incomingMessage }) {
     await processarNome({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
     return;
   }
-
   if (estado && estado.step === STEP_ESCOLHER_DIA) {
-    await processarEscolhaDia({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
+    await processarEscolhaDia({ company, customerPhone, customerMessage, estado, systemPrompt });
     return;
   }
-
   if (estado && estado.step === STEP_ESCOLHER_HORARIO) {
     await processarEscolhaHorario({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
     return;
@@ -49,14 +46,12 @@ export async function handleMessage({ company, incomingMessage }) {
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     return;
   }
-
   if (intencao === "listar_profissionais") {
     const profs = await listarProfissionais(company.id);
     const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente perguntou quais profissionais existem. Apresente de forma calorosa, sem markdown: " + profs.map((p) => p.name).join(", ") + ". Ao final pergunte qual servico ele gostaria de agendar." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     return;
   }
-
   if (intencao === "conversar") {
     await responderComIA({ company, customerPhone, customerMessage, systemPrompt });
     return;
@@ -78,7 +73,6 @@ export async function handleMessage({ company, incomingMessage }) {
 
   if (phase === "frio") await advanceStage({ companyId: company.id, customerPhone });
 
-  // Se ja tem nome, vai direto pros dias. Se nao tem, pede o nome primeiro.
   if (lead?.name) {
     await mostrarDias({ company, customerPhone, service, systemPrompt });
   } else {
@@ -87,12 +81,10 @@ export async function handleMessage({ company, incomingMessage }) {
     await setConversationState({ companyId: company.id, customerPhone, step: STEP_COLETAR_NOME, context: { serviceId: service.id, serviceName: service.name } });
   }
 }
-
 async function processarNome({ company, customerPhone, customerMessage, estado, systemPrompt, lead }) {
   await salvarNomeCliente({ leadId: lead.id, name: customerMessage.trim() });
-  const { serviceId, serviceName } = estado.context;
-  const service = { id: serviceId, name: serviceName };
-  const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente informou o nome: " + customerMessage.trim() + ". Confirme o nome de forma calorosa e continue para mostrar os dias disponiveis." }] });
+  const service = { id: estado.context.serviceId, name: estado.context.serviceName };
+  const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente informou o nome: " + customerMessage.trim() + ". Confirme o nome de forma calorosa e diga que vai mostrar os dias disponiveis." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await mostrarDias({ company, customerPhone, service, systemPrompt });
 }
@@ -105,7 +97,7 @@ async function mostrarDias({ company, customerPhone, service, systemPrompt }) {
   await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_DIA, context: { serviceId: service.id, serviceName: service.name, dias: dias.map((d) => ({ iso: d.data.toISOString(), label: d.label })) } });
 }
 
-async function processarEscolhaDia({ company, customerPhone, customerMessage, estado, systemPrompt, lead }) {
+async function processarEscolhaDia({ company, customerPhone, customerMessage, estado, systemPrompt }) {
   const { serviceId, serviceName, dias } = estado.context;
   const listaDias = dias.map((d, i) => i + ": " + d.label).join("\n");
   const prompt = "Dias oferecidos:\n" + listaDias + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nIdentifique o indice do dia escolhido. Responda APENAS o numero. Se nao identificar: nenhum";
@@ -160,7 +152,7 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   await criarAgendamento({ company, provider: { id: escolha.providerId, name: escolha.providerName, phone: null }, service: { id: serviceId, name: serviceName }, scheduledAt: new Date(escolha.horarioISO), customerPhone, customerName });
   await advanceStage({ companyId: company.id, customerPhone });
 
-  const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente " + (customerName || "") + " confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + estado.context.diaLabel + ". Confirme de forma calorosa, sem cumprimento, sem emoji excessivo, informando que avisara quando a profissional confirmar." }] });
+  const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente " + (customerName || "") + " confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + estado.context.diaLabel + ". Confirme de forma calorosa, sem cumprimento inicial, sem emoji excessivo, informando que avisara quando a profissional confirmar." }] });
   await sendTextMessage({ to: customerPhone, message: confirmacao, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await clearConversationState({ companyId: company.id, customerPhone });
 }
@@ -169,4 +161,3 @@ async function responderComIA({ company, customerPhone, customerMessage, systemP
   const resposta = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: customerMessage }] });
   if (resposta) await sendTextMessage({ to: customerPhone, message: resposta, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
 }
-'@ | Out-File -FilePath "src\funnels\agendamento.js" -Encoding utf8
