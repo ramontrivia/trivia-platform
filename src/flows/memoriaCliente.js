@@ -1,17 +1,12 @@
-﻿@'
-import { supabase } from "../services/supabase.js";
+﻿import { supabase } from "../services/supabase.js";
 
-// Salva o nome do cliente no lead
 export async function salvarNomeCliente({ leadId, name }) {
   await supabase.from("tp_leads").update({ name }).eq("id", leadId);
 }
 
-// Monta a memoria completa do cliente
 export async function montarMemoriaCliente({ companyId, customerPhone, leadId }) {
   const partes = [];
-
   const { data: lead } = await supabase.from("tp_leads").select("name").eq("id", leadId).single();
-
   const { data: agendamentos } = await supabase
     .from("tp_appointments")
     .select("scheduled_at, status, service_id, provider_id")
@@ -71,4 +66,3 @@ export async function montarMemoriaCliente({ companyId, customerPhone, leadId })
   partes.push("\nUse a memoria com naturalidade. Chame o cliente pelo nome sempre que possivel.");
   return partes.join("\n");
 }
-'@ | Out-File -FilePath "src\flows\memoriaCliente.js" -Encoding utf8

@@ -1,4 +1,3 @@
-@'
 import { supabase } from "../services/supabase.js";
 import { sendTextMessage } from "../services/whatsapp.js";
 
@@ -22,7 +21,7 @@ export async function criarAgendamento({ company, provider, service, scheduledAt
     return null;
   }
 
-  if (provider.phone && provider.phone !== "null" && !provider.phone.includes("provisorio")) {
+  if (provider.phone && !provider.phone.includes("provisorio")) {
     const dataFormatada = scheduledAt.toLocaleDateString("pt-BR");
     const horaFormatada = scheduledAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     const nomeCliente = customerName || "Cliente";
@@ -36,4 +35,3 @@ export async function criarAgendamento({ company, provider, service, scheduledAt
 
   return appointment;
 }
-'@ | Out-File -FilePath "src\flows\criarAgendamento.js" -Encoding utf8
