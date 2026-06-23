@@ -40,7 +40,7 @@ export async function handleMessage({ company, incomingMessage }) {
   }
 
   // Resposta SIM/NÃO de profissional confirmando agendamento
-  if (msgUpper === "SIM" || msgUpper === "NAO" || msgUpper === "NÃO" || msgUpper === "NAO." || msgUpper === "SIM.") {
+  if (msgUpper.includes("SIM") || msgUpper.includes("NAO") || msgUpper.includes("NÃO") || msgUpper.includes("NÃO")) {
     const provider = await isProvider({ companyId: company.id, customerPhone });
     if (provider) {
       await processarRespostaProfissional({ company, customerPhone, provider, resposta: msgUpper });
@@ -143,7 +143,7 @@ async function processarRespostaProfissional({ company, customerPhone, provider,
   const data = new Date(agendamento.scheduled_at).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" });
   const hora = new Date(agendamento.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-  if (resposta.startsWith("SIM")) {
+  if (resposta.includes("SIM")) {
     await supabase.from("tp_appointments").update({ status: "confirmado" }).eq("id", agendamento.id);
     await sendTextMessage({ to: customerPhone, message: "Ótimo, " + provider.name + "! Agendamento confirmado ✅\n" + nomeServico + " com " + cliente + " em " + data + " às " + hora + ".", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     await sendTextMessage({ to: agendamento.customer_phone, message: "Boa notícia! " + provider.name + " confirmou seu agendamento de " + nomeServico + " para " + data + " às " + hora + ". Te esperamos! 🎉", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
