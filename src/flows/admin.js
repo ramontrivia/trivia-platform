@@ -12,13 +12,16 @@ export async function isAdmin({ companyId, customerPhone }) {
 }
 
 export async function isProvider({ companyId, customerPhone }) {
-  const { data } = await supabase
+  console.log("🔍 isProvider buscando phone:", customerPhone);
+  const { data, error } = await supabase
     .from("tp_providers")
-    .select("id, name")
-    .eq("company_id", companyId)
+    .select("id, name, company_id")
     .eq("phone", customerPhone)
     .single();
-  return data || null;
+  console.log("🔍 isProvider resultado:", data, "erro:", error?.message);
+  if (!data) return null;
+  if (data.company_id !== companyId) return null;
+  return data;
 }
 
 export async function enviarAgendaProfissional({ company, customerPhone, provider }) {
@@ -44,7 +47,6 @@ export async function enviarAgendaProfissional({ company, customerPhone, provide
   const nomesServicos = {};
   (servs || []).forEach((s) => { nomesServicos[s.id] = s.name; });
 
-  // Agrupa por data
   const porData = {};
   agendamentos.forEach((a) => {
     const data = new Date(a.scheduled_at).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" });
