@@ -20,9 +20,13 @@ export async function handleMessage({ company, incomingMessage }) {
   const customerPhone = incomingMessage.from;
   const customerMessage = incomingMessage.text;
 
+  console.log("📞 Mensagem de:", customerPhone, "| Texto:", customerMessage);
+
   // Verifica se é um admin enviando o comando ADM
   if (customerMessage.trim().toUpperCase() === "ADM") {
+    console.log("🔑 Comando ADM detectado de:", customerPhone);
     const admin = await isAdmin({ companyId: company.id, customerPhone });
+    console.log("👤 Admin encontrado:", admin);
     if (admin) {
       await enviarRelatorioAdmin({ company, customerPhone, adminName: admin.name });
       return;
@@ -173,7 +177,6 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   await criarAgendamento({ company, provider: { id: escolha.providerId, name: escolha.providerName, phone: null }, service: { id: serviceId, name: serviceName }, scheduledAt: new Date(escolha.horarioISO), customerPhone, customerName });
   await advanceStage({ companyId: company.id, customerPhone });
 
-  // Notifica a profissional
   const { data: providerData } = await supabase
     .from("tp_providers")
     .select("phone")
