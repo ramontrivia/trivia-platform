@@ -10,6 +10,7 @@ import { getConversationState, setConversationState, clearConversationState } fr
 import { getOrCreateLead, advanceStage } from "../crm/crmService.js";
 import { montarMemoriaCliente, salvarNomeCliente } from "../flows/memoriaCliente.js";
 import { supabase } from "../services/supabase.js";
+import { isAdmin, enviarRelatorioAdmin } from "../flows/admin.js";
 
 const STEP_COLETAR_NOME = "agendamento_coletar_nome";
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
@@ -18,6 +19,16 @@ const STEP_ESCOLHER_HORARIO = "agendamento_escolher_horario";
 export async function handleMessage({ company, incomingMessage }) {
   const customerPhone = incomingMessage.from;
   const customerMessage = incomingMessage.text;
+
+  // Verifica se é um admin enviando o comando ADM
+  if (customerMessage.trim().toUpperCase() === "ADM") {
+    const admin = await isAdmin({ companyId: company.id, customerPhone });
+    if (admin) {
+      await enviarRelatorioAdmin({ company, customerPhone, adminName: admin.name });
+      return;
+    }
+  }
+
   const lead = await getOrCreateLead({ companyId: company.id, customerPhone });
   const knowledge = loadKnowledge(company.client_key);
   const phase = lead?.stage || "frio";
@@ -253,12 +264,12 @@ async function processarCancelamento({ company, customerPhone, customerMessage, 
 }
 
 async function responderComIA({ company, customerPhone, customerMessage, systemPrompt }) {
-  const resposta = await generateResponse({ 
-    systemPrompt, 
-    conversationHistory: [{ 
-      role: "user", 
+  const resposta = await generateResponse({
+    systemPrompt,
+    conversationHistory: [{
+      role: "user",
       content: "O cliente enviou: \"" + customerMessage + "\". Responda de forma natural e humanizada. NÃO liste serviços, NÃO pergunte o que deseja agendar. Apenas responda o que foi dito de forma acolhedora e simples."
-    }] 
+    }]
   });
   if (resposta) await sendTextMessage({ to: customerPhone, message: resposta, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
 }
