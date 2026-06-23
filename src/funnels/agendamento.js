@@ -10,7 +10,7 @@ import { getConversationState, setConversationState, clearConversationState } fr
 import { getOrCreateLead, advanceStage } from "../crm/crmService.js";
 import { montarMemoriaCliente, salvarNomeCliente } from "../flows/memoriaCliente.js";
 import { supabase } from "../services/supabase.js";
-import { isAdmin, enviarRelatorioAdmin } from "../flows/admin.js";
+import { isAdmin, enviarRelatorioAdmin, isProvider, enviarAgendaProfissional } from "../flows/admin.js";
 
 const STEP_COLETAR_NOME = "agendamento_coletar_nome";
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
@@ -20,15 +20,20 @@ export async function handleMessage({ company, incomingMessage }) {
   const customerPhone = incomingMessage.from;
   const customerMessage = incomingMessage.text;
 
-  console.log("📞 Mensagem de:", customerPhone, "| Texto:", customerMessage);
-
-  // Verifica se é um admin enviando o comando ADM
+  // Comando ADM — painel da gerência
   if (customerMessage.trim().toUpperCase() === "ADM") {
-    console.log("🔑 Comando ADM detectado de:", customerPhone);
     const admin = await isAdmin({ companyId: company.id, customerPhone });
-    console.log("👤 Admin encontrado:", admin);
     if (admin) {
       await enviarRelatorioAdmin({ company, customerPhone, adminName: admin.name });
+      return;
+    }
+  }
+
+  // Comando AGENDA — agenda da profissional
+  if (customerMessage.trim().toUpperCase() === "AGENDA") {
+    const provider = await isProvider({ companyId: company.id, customerPhone });
+    if (provider) {
+      await enviarAgendaProfissional({ company, customerPhone, provider });
       return;
     }
   }
