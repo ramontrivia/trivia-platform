@@ -108,7 +108,7 @@ export async function handleMessage({ company, incomingMessage }) {
     return;
   }
   if (intencao === "conversar") {
-    await responderComIA({ company, customerPhone, customerMessage, systemPrompt });
+    await responderComIA({ company, customerPhone, customerMessage, systemPrompt, lead });
     return;
   }
   if (intencao === "cancelar") {
@@ -278,20 +278,6 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente " + (customerName || "") + " confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + estado.context.diaLabel + ". Confirme de forma calorosa, sem cumprimento inicial, sem emoji excessivo, informando que avisara quando a profissional confirmar." }] });
   await sendTextMessage({ to: customerPhone, message: confirmacao, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await clearConversationState({ companyId: company.id, customerPhone });
-
-  // Analisa sentimento após agendamento
-  const { data: interacoes } = await supabase
-    .from("tp_lead_interactions")
-    .select("message")
-    .eq("company_id", company.id)
-    .eq("customer_phone", customerPhone)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  if (interacoes && interacoes.length > 0) {
-    const mensagens = interacoes.reverse().map((i) => i.message).filter(Boolean);
-    analisarSentimento({ company, customerPhone, customerName, mensagens }).catch(console.error);
-  }
 }
 
 async function iniciarCancelamento({ company, customerPhone, systemPrompt }) {
@@ -396,22 +382,11 @@ async function processarCancelamento({ company, customerPhone, customerMessage, 
   await clearConversationState({ companyId: company.id, customerPhone });
 
   // Analisa sentimento após cancelamento
-  const { data: interacoes } = await supabase
-    .from("tp_lead_interactions")
-    .select("message")
-    .eq("company_id", company.id)
-    .eq("customer_phone", customerPhone)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  if (interacoes && interacoes.length > 0) {
-    const customerName = lead?.name || null;
-    const mensagens = interacoes.reverse().map((i) => i.message).filter(Boolean);
-    analisarSentimento({ company, customerPhone, customerName, mensagens }).catch(console.error);
-  }
+  const customerName = lead?.name || null;
+  analisarSentimento({ company, customerPhone, customerName, mensagens: [customerMessage] }).catch(console.error);
 }
 
-async function responderComIA({ company, customerPhone, customerMessage, systemPrompt }) {
+async function responderComIA({ company, customerPhone, customerMessage, systemPrompt, lead }) {
   const resposta = await generateResponse({
     systemPrompt,
     conversationHistory: [{
@@ -420,4 +395,8 @@ async function responderComIA({ company, customerPhone, customerMessage, systemP
     }]
   });
   if (resposta) await sendTextMessage({ to: customerPhone, message: resposta, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+
+  // Analisa sentimento em background
+  const customerName = lead?.name || null;
+  analisarSentimento({ company, customerPhone, customerName, mensagens: [customerMessage] }).catch(console.error);
 }
