@@ -11,12 +11,12 @@ import { getOrCreateLead, advanceStage } from "../crm/crmService.js";
 import { montarMemoriaCliente, salvarNomeCliente } from "../flows/memoriaCliente.js";
 import { supabase } from "../services/supabase.js";
 import { isAdmin, enviarRelatorioAdmin, isProvider, enviarAgendaProfissional } from "../flows/admin.js";
+import { iniciarReagendamento, processarReagendamento } from "../modules/reagendamento.js";
 
 const STEP_COLETAR_NOME = "agendamento_coletar_nome";
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
 const STEP_ESCOLHER_HORARIO = "agendamento_escolher_horario";
 
-// Número da recepção — trocar quando tiver o número real
 const TELEFONE_RECEPCAO = "5531999999999";
 const LINK_RECEPCAO = "https://wa.me/" + TELEFONE_RECEPCAO;
 
@@ -27,7 +27,6 @@ export async function handleMessage({ company, incomingMessage }) {
 
   console.log("📞 DE:", customerPhone, "| MSG:", customerMessage);
 
-  // Comando ADM — painel da gerência
   if (msgUpper === "ADM") {
     const admin = await isAdmin({ companyId: company.id, customerPhone });
     if (admin) {
@@ -36,7 +35,6 @@ export async function handleMessage({ company, incomingMessage }) {
     }
   }
 
-  // Comando AGENDA — agenda da profissional
   if (msgUpper === "AGENDA") {
     const provider = await isProvider({ companyId: company.id, customerPhone });
     if (provider) {
@@ -45,7 +43,6 @@ export async function handleMessage({ company, incomingMessage }) {
     }
   }
 
-  // Resposta SIM/NÃO de profissional confirmando agendamento
   if (msgUpper.includes("SIM") || msgUpper.includes("NAO") || msgUpper.includes("NÃO")) {
     const provider = await isProvider({ companyId: company.id, customerPhone });
     if (provider) {
@@ -78,6 +75,10 @@ export async function handleMessage({ company, incomingMessage }) {
     await processarCancelamento({ company, customerPhone, customerMessage, estado, systemPrompt });
     return;
   }
+  if (estado && (estado.step === "reagendar_escolher_agendamento" || estado.step === "reagendar_escolher_dia" || estado.step === "reagendar_escolher_horario")) {
+    await processarReagendamento({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
+    return;
+  }
 
   const intencao = await classificarIntencao(customerMessage);
 
@@ -101,6 +102,10 @@ export async function handleMessage({ company, incomingMessage }) {
     await iniciarCancelamento({ company, customerPhone, systemPrompt });
     return;
   }
+  if (intencao === "reagendar") {
+    await iniciarReagendamento({ company, customerPhone, systemPrompt });
+    return;
+  }
   if (intencao === "humano") {
     await direcionarRecepcao({ company, customerPhone, systemPrompt, motivo: "atendimento humano" });
     return;
@@ -116,7 +121,6 @@ export async function handleMessage({ company, incomingMessage }) {
 
   const { service, hasProvider, terceirizado } = identificacao;
 
-  // Serviço terceirizado — direciona para recepção
   if (terceirizado) {
     await direcionarRecepcao({ company, customerPhone, systemPrompt, motivo: "servico especial: " + service.name });
     return;
@@ -342,7 +346,6 @@ async function processarCancelamento({ company, customerPhone, customerMessage, 
   const idsParaCancelar = agendamentosParaCancelar.map((a) => a.id);
   await supabase.from("tp_appointments").update({ status: "cancelado" }).in("id", idsParaCancelar);
 
-  // Avisa cada profissional do cancelamento
   for (const agendamento of agendamentosParaCancelar) {
     const { data: providerData } = await supabase
       .from("tp_providers")
