@@ -1,31 +1,30 @@
 // =====================================================================
 // lembrete.js
-// Módulo de lembrete 24h — envia mensagem automática para clientes
-// com agendamento confirmado no dia seguinte.
-// Disparado via N8N todo dia às 18h através do endpoint /lembrete
+// Módulo de lembrete — envia mensagem automática para clientes
+// com agendamento confirmado no dia de hoje às 8h da manhã.
+// Disparado via N8N todo dia às 8h através do endpoint /lembrete
 // =====================================================================
 
 import { supabase } from "../services/supabase.js";
 import { sendTextMessage } from "../services/whatsapp.js";
 
 export async function enviarLembretes() {
-  console.log("⏰ Módulo Lembrete 24h iniciado...");
+  console.log("⏰ Módulo Lembrete iniciado...");
 
-  // Calcula o intervalo de amanhã (00:00 até 23:59)
-  const amanha = new Date();
-  amanha.setDate(amanha.getDate() + 1);
-  amanha.setHours(0, 0, 0, 0);
+  // Calcula o intervalo de hoje (00:00 até 23:59)
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
 
-  const fimAmanha = new Date(amanha);
-  fimAmanha.setHours(23, 59, 59, 999);
+  const fimHoje = new Date();
+  fimHoje.setHours(23, 59, 59, 999);
 
-  // Busca agendamentos confirmados de amanhã
+  // Busca agendamentos confirmados de hoje
   const { data: agendamentos, error } = await supabase
     .from("tp_appointments")
     .select("id, scheduled_at, customer_phone, customer_name, service_id, provider_id, company_id")
     .eq("status", "confirmado")
-    .gte("scheduled_at", amanha.toISOString())
-    .lte("scheduled_at", fimAmanha.toISOString());
+    .gte("scheduled_at", hoje.toISOString())
+    .lte("scheduled_at", fimHoje.toISOString());
 
   if (error) {
     console.error("Erro ao buscar agendamentos:", error.message);
@@ -33,13 +32,12 @@ export async function enviarLembretes() {
   }
 
   if (!agendamentos || agendamentos.length === 0) {
-    console.log("✅ Nenhum agendamento confirmado para amanhã.");
+    console.log("✅ Nenhum agendamento confirmado para hoje.");
     return { sucesso: true, enviados: 0 };
   }
 
   console.log("📋 Agendamentos encontrados:", agendamentos.length);
 
-  // Busca dados das empresas, serviços e profissionais
   const companyIds = [...new Set(agendamentos.map((a) => a.company_id))];
   const servIds = [...new Set(agendamentos.map((a) => a.service_id))];
   const provIds = [...new Set(agendamentos.map((a) => a.provider_id))];
@@ -68,7 +66,7 @@ export async function enviarLembretes() {
       const nomeProfissional = mapaProviders[agendamento.provider_id] || "profissional";
       const hora = new Date(agendamento.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-      const mensagem = `Oi ${nomeCliente}! 😊 Lembrando que você tem horário amanhã às ${hora} com ${nomeProfissional} no Espaço Channel.\n\nSe precisar cancelar ou remarcar, é só me avisar aqui. Até amanhã! 💇‍♀️`;
+      const mensagem = `Bom dia, ${nomeCliente}! ☀️ Lembrando que hoje você tem horário às ${hora} com ${nomeProfissional} no Espaço Channel.\n\nSe precisar cancelar ou remarcar, é só me avisar aqui. Te esperamos! 💇‍♀️`;
 
       await sendTextMessage({
         to: agendamento.customer_phone,
