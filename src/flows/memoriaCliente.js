@@ -22,7 +22,13 @@ export async function salvarNomeCliente({ leadId, name }) {
 
 export async function montarMemoriaCliente({ companyId, customerPhone, leadId }) {
   const partes = [];
-  const { data: lead } = await supabase.from("tp_leads").select("name").eq("id", leadId).single();
+
+  const { data: lead } = await supabase
+    .from("tp_leads")
+    .select("name, notas_pessoais, horario_preferido, profissional_favorita, ultima_observacao")
+    .eq("id", leadId)
+    .single();
+
   const { data: agendamentos } = await supabase
     .from("tp_appointments")
     .select("scheduled_at, status, service_id, provider_id")
@@ -59,6 +65,10 @@ export async function montarMemoriaCliente({ companyId, customerPhone, leadId })
 
   partes.push("=== MEMORIA DESTE CLIENTE ===");
   if (lead?.name) partes.push("Nome: " + lead.name);
+  if (lead?.notas_pessoais) partes.push("Notas pessoais: " + lead.notas_pessoais);
+  if (lead?.horario_preferido) partes.push("Horário preferido: " + lead.horario_preferido);
+  if (lead?.profissional_favorita) partes.push("Profissional favorita: " + lead.profissional_favorita);
+  if (lead?.ultima_observacao) partes.push("Última observação: " + lead.ultima_observacao);
 
   if (agendamentos && agendamentos.length > 0) {
     partes.push("\nHistorico de agendamentos:");
@@ -71,7 +81,7 @@ export async function montarMemoriaCliente({ companyId, customerPhone, leadId })
     const contagem = {};
     agendamentos.forEach((a) => { const p = nomesProviders[a.provider_id]; if (p) contagem[p] = (contagem[p] || 0) + 1; });
     const favorita = Object.keys(contagem).sort((x, y) => contagem[y] - contagem[x])[0];
-    if (favorita && contagem[favorita] > 1) partes.push("\nProfissional preferida: " + favorita);
+    if (favorita && contagem[favorita] > 1) partes.push("\nProfissional mais frequente: " + favorita);
   }
 
   if (interacoes.length > 0) {
@@ -79,6 +89,6 @@ export async function montarMemoriaCliente({ companyId, customerPhone, leadId })
     interacoes.reverse().forEach((i) => { if (i.message) partes.push("- " + i.message); });
   }
 
-  partes.push("\nUse a memoria com naturalidade. Chame o cliente pelo nome sempre que possivel.");
+  partes.push("\nUse a memoria com naturalidade. Chame o cliente pelo nome sempre que possivel. Use as preferencias para personalizar o atendimento.");
   return partes.join("\n");
 }
