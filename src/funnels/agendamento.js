@@ -12,6 +12,7 @@ import { montarMemoriaCliente, salvarNomeCliente } from "../flows/memoriaCliente
 import { supabase } from "../services/supabase.js";
 import { isAdmin, enviarRelatorioAdmin, isProvider, enviarAgendaProfissional } from "../flows/admin.js";
 import { iniciarReagendamento, processarReagendamento } from "../modules/reagendamento.js";
+import { oferecerListaEspera, processarRespostaListaEspera, notificarListaEspera } from "../modules/listaEspera.js";
 
 const STEP_COLETAR_NOME = "agendamento_coletar_nome";
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
@@ -79,6 +80,10 @@ export async function handleMessage({ company, incomingMessage }) {
     await processarReagendamento({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
     return;
   }
+  if (estado && estado.step === "lista_espera_aguardando_confirmacao") {
+    await processarRespostaListaEspera({ company, customerPhone, customerMessage, estado, systemPrompt });
+    return;
+  }
 
   const intencao = await classificarIntencao(customerMessage);
 
@@ -134,7 +139,7 @@ export async function handleMessage({ company, incomingMessage }) {
   if (phase === "frio") await advanceStage({ companyId: company.id, customerPhone });
 
   if (lead?.name) {
-    await mostrarDias({ company, customerPhone, service, systemPrompt });
+    await mostrarDias({ company, customerPhone, service, systemPrompt, lead });
   } else {
     const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente quer agendar " + service.name + ". Antes de mostrar os horarios, peca o nome dele de forma natural e acolhedora." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
@@ -177,6 +182,8 @@ async function processarRespostaProfissional({ company, customerPhone, provider,
     await supabase.from("tp_appointments").update({ status: "cancelado" }).eq("id", agendamento.id);
     await sendTextMessage({ to: customerPhone, message: "Entendido, " + provider.name + ". Agendamento cancelado.", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     await sendTextMessage({ to: agendamento.customer_phone, message: "Olá! Infelizmente " + provider.name + " não poderá atender seu agendamento de " + nomeServico + " em " + data + " às " + hora + ". Entre em contato para remarcar. 💙", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+    // Notifica lista de espera quando profissional cancela
+    await notificarListaEspera({ company, serviceId: agendamento.service_id, serviceName: nomeServico });
   }
 }
 
@@ -185,19 +192,19 @@ async function processarNome({ company, customerPhone, customerMessage, estado, 
   const service = { id: estado.context.serviceId, name: estado.context.serviceName };
   const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente informou o nome: " + customerMessage.trim() + ". Confirme o nome de forma calorosa e diga que vai mostrar os dias disponiveis." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-  await mostrarDias({ company, customerPhone, service, systemPrompt });
+  await mostrarDias({ company, customerPhone, service, systemPrompt, lead: { ...lead, name: customerMessage.trim() } });
 }
 
-async function mostrarDias({ company, customerPhone, service, systemPrompt }) {
+async function mostrarDias({ company, customerPhone, service, systemPrompt, lead }) {
   const dias = listarProximosDias(6);
   const listaDias = dias.map((d, i) => (i + 1) + ") " + d.label).join("\n");
   const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "Mostre os proximos dias disponiveis para " + service.name + " de forma natural, sem markdown:\n" + listaDias + "\nPergunte qual dia o cliente prefere." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-  await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_DIA, context: { serviceId: service.id, serviceName: service.name, dias: dias.map((d) => ({ iso: d.data.toISOString(), label: d.label })) } });
+  await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_DIA, context: { serviceId: service.id, serviceName: service.name, customerName: lead?.name || null, dias: dias.map((d) => ({ iso: d.data.toISOString(), label: d.label })) } });
 }
 
 async function processarEscolhaDia({ company, customerPhone, customerMessage, estado, systemPrompt }) {
-  const { serviceId, serviceName, dias } = estado.context;
+  const { serviceId, serviceName, customerName, dias } = estado.context;
   const listaDias = dias.map((d, i) => i + ": " + d.label).join("\n");
   const prompt = "Dias oferecidos:\n" + listaDias + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nIdentifique o indice do dia escolhido. Responda APENAS o numero. Se nao identificar: nenhum";
   const resposta = await generateResponse({ systemPrompt: "Voce e um classificador preciso. Responda apenas o numero.", conversationHistory: [{ role: "user", content: prompt }] });
@@ -216,15 +223,15 @@ async function processarEscolhaDia({ company, customerPhone, customerMessage, es
 
   const horarios = await horariosDoDia({ serviceId, companyId: company.id, data: new Date(diaEscolhido.iso) });
   if (horarios.length === 0) {
-    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "Nao ha horarios em " + diaEscolhido.label + " para " + serviceName + ". Avise de forma acolhedora e pergunte se quer outro dia." }] });
-    await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+    // Sem horários — oferecer lista de espera
+    await oferecerListaEspera({ company, customerPhone, customerName, serviceId, serviceName, systemPrompt });
     return;
   }
 
   const listaHorarios = horarios.map((h) => h.horario + ": " + h.profissionais.map((p) => p.name).join(", ")).join("\n");
   const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente escolheu " + diaEscolhido.label + " para " + serviceName + ". Mostre os horarios livres de forma natural, sem markdown:\n" + listaHorarios + "\nPergunte qual horario e profissional ele prefere. Deixe claro que ele deve informar TANTO o horario QUANTO a profissional." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-  await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: { serviceId, serviceName, diaLabel: diaEscolhido.label, horarios: horarios.map((h) => ({ horario: h.horario, horarioISO: h.horarioISO, profissionais: h.profissionais })) } });
+  await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: { serviceId, serviceName, customerName, diaLabel: diaEscolhido.label, horarios: horarios.map((h) => ({ horario: h.horario, horarioISO: h.horarioISO, profissionais: h.profissionais })) } });
 }
 
 async function processarEscolhaHorario({ company, customerPhone, customerMessage, estado, systemPrompt, lead }) {
@@ -309,6 +316,8 @@ async function iniciarCancelamento({ company, customerPhone, systemPrompt }) {
         indice: i,
         id: a.id,
         service: nomesServicos[a.service_id],
+        serviceId: a.service_id,
+        serviceName: nomesServicos[a.service_id],
         provider: nomesProviders[a.provider_id],
         providerName: nomesProviders[a.provider_id],
         data: new Date(a.scheduled_at).toLocaleDateString("pt-BR"),
@@ -358,6 +367,9 @@ async function processarCancelamento({ company, customerPhone, customerMessage, 
       const msgProfissional = "Olá " + agendamento.providerName + "! O agendamento de " + agendamento.service + " em " + agendamento.data + " às " + agendamento.hora + " foi cancelado pelo cliente.";
       await sendTextMessage({ to: providerData[0].phone, message: msgProfissional, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     }
+
+    // Notifica lista de espera
+    await notificarListaEspera({ company, serviceId: agendamento.serviceId, serviceName: agendamento.serviceName });
   }
 
   const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente cancelou " + agendamentosParaCancelar.length + " agendamento(s) com sucesso. Confirme de forma calorosa e pergunte se precisa de mais alguma coisa." }] });
