@@ -1,18 +1,9 @@
-// =====================================================================
-// server.js
-// O "porteiro" da plataforma. Recebe os avisos da Meta (WhatsApp)
-// pela internet, confere se são legítimos, e entrega para o
-// orchestrator cuidar do resto.
-//
-// Este arquivo é FIXO — nunca contém lógica de negócio, só a parte
-// de "atender a porta" e validar o que chega.
-// =====================================================================
-
 import express from "express";
 import fetch from "node-fetch";
 import FormData from "form-data";
 import OpenAI from "openai";
 import { handleIncomingMessage } from "./core/orchestrator.js";
+import { enviarLembretes } from "./modules/lembrete.js";
 
 const app = express();
 app.use(express.json());
@@ -25,7 +16,6 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // Função: baixa o áudio da Meta e transcreve com Whisper
 // -------------------------------------------------------
 async function transcreverAudio(mediaId, token) {
-  // 1. Pega a URL real do arquivo de áudio
   const metaRes = await fetch(
     `https://graph.facebook.com/v19.0/${mediaId}`,
     { headers: { Authorization: `Bearer ${token}` } }
@@ -33,13 +23,11 @@ async function transcreverAudio(mediaId, token) {
   const metaData = await metaRes.json();
   const audioUrl = metaData.url;
 
-  // 2. Baixa o arquivo de áudio
   const audioRes = await fetch(audioUrl, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const audioBuffer = await audioRes.buffer();
 
-  // 3. Monta o FormData para enviar ao Whisper
   const form = new FormData();
   form.append("file", audioBuffer, {
     filename: "audio.ogg",
@@ -48,7 +36,6 @@ async function transcreverAudio(mediaId, token) {
   form.append("model", "whisper-1");
   form.append("language", "pt");
 
-  // 4. Envia ao Whisper e retorna o texto
   const whisperRes = await fetch(
     "https://api.openai.com/v1/audio/transcriptions",
     {
@@ -64,8 +51,9 @@ async function transcreverAudio(mediaId, token) {
   return whisperData.text || "";
 }
 
-// A Meta usa este endpoint (GET) só para confirmar, na primeira vez,
-// que esta URL realmente pertence a você. É uma verificação única.
+// -------------------------------------------------------
+// GET /webhook — verificação da Meta
+// -------------------------------------------------------
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -78,8 +66,9 @@ app.get("/webhook", (req, res) => {
   }
 });
 
-// Este é o endpoint (POST) que recebe as mensagens de verdade,
-// toda vez que alguém escreve no WhatsApp de um cliente.
+// -------------------------------------------------------
+// POST /webhook — mensagens do WhatsApp
+// -------------------------------------------------------
 app.post("/webhook", async (req, res) => {
   try {
     const entry = req.body.entry?.[0];
@@ -96,19 +85,16 @@ app.post("/webhook", async (req, res) => {
     let textoFinal = "";
 
     if (messageData.type === "audio") {
-      // Mensagem de áudio — transcreve com Whisper
       console.log("🎙️ Áudio recebido, transcrevendo...");
       const token = process.env.WHATSAPP_TOKEN;
       const mediaId = messageData.audio.id;
       textoFinal = await transcreverAudio(mediaId, token);
       console.log("📝 Transcrição:", textoFinal);
     } else {
-      // Mensagem de texto normal
       textoFinal = messageData.text?.body || "";
     }
 
     if (!textoFinal) {
-      // Mensagem sem texto nem áudio reconhecível (ex: imagem, sticker)
       return res.sendStatus(200);
     }
 
@@ -123,6 +109,26 @@ app.post("/webhook", async (req, res) => {
   } catch (error) {
     console.error("Erro ao processar webhook:", error.message);
     res.sendStatus(500);
+  }
+});
+
+// -------------------------------------------------------
+// POST /lembrete — disparado pelo N8N todo dia às 18h
+// -------------------------------------------------------
+app.post("/lembrete", async (req, res) => {
+  try {
+    // Verificação simples de segurança
+    const token = req.headers["x-trivia-token"];
+    if (token !== process.env.VERIFY_TOKEN) {
+      return res.status(401).json({ erro: "Token inválido" });
+    }
+
+    console.log("⏰ Endpoint /lembrete chamado pelo N8N");
+    const resultado = await enviarLembretes();
+    res.status(200).json(resultado);
+  } catch (error) {
+    console.error("Erro no endpoint /lembrete:", error.message);
+    res.status(500).json({ erro: error.message });
   }
 });
 
