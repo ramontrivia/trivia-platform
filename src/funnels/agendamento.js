@@ -20,11 +20,11 @@ import { extrairEsalvarMemoria } from "../modules/memoriaRica.js";
 const STEP_COLETAR_NOME = "agendamento_coletar_nome";
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
 const STEP_ESCOLHER_HORARIO = "agendamento_escolher_horario";
+const STEP_CONFIRMAR_PROFISSIONAL = "agendamento_confirmar_profissional";
 
 const TELEFONE_RECEPCAO = "5531999999999";
 const LINK_RECEPCAO = "https://wa.me/" + TELEFONE_RECEPCAO;
 
-// Tenta identificar dia mencionado na mensagem
 async function identificarDiaNaMensagem(customerMessage, dias) {
   const listaDias = dias.map((d, i) => i + ": " + d.label).join("\n");
   const prompt = "Dias disponiveis:\n" + listaDias + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nO cliente mencionou algum dia especifico? Responda APENAS o indice do dia. Se nao mencionou nenhum dia: nenhum";
@@ -98,6 +98,10 @@ export async function handleMessage({ company, incomingMessage }) {
     await processarEscolhaHorario({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
     return;
   }
+  if (estado && estado.step === STEP_CONFIRMAR_PROFISSIONAL) {
+    await processarConfirmacaoProfissional({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
+    return;
+  }
   if (estado && estado.step === "agendamento_cancelar") {
     await processarCancelamento({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
     return;
@@ -164,13 +168,11 @@ export async function handleMessage({ company, incomingMessage }) {
 
   if (phase === "frio") await advanceStage({ companyId: company.id, customerPhone });
 
-  // Tenta identificar se o cliente já mencionou um dia
   const dias = listarProximosDias(6);
   const diaJaMencionado = await identificarDiaNaMensagem(customerMessage, dias);
 
   if (lead?.name) {
     if (diaJaMencionado) {
-      // Cliente já informou o dia — vai direto para os horários
       const horarios = await horariosDoDia({ serviceId: service.id, companyId: company.id, data: new Date(diaJaMencionado.iso || diaJaMencionado.data) });
       if (horarios.length === 0) {
         await oferecerListaEspera({ company, customerPhone, customerName: lead.name, serviceId: service.id, serviceName: service.name, systemPrompt });
@@ -276,7 +278,7 @@ async function processarEscolhaDia({ company, customerPhone, customerMessage, es
 }
 
 async function processarEscolhaHorario({ company, customerPhone, customerMessage, estado, systemPrompt, lead }) {
-  const { serviceId, serviceName, horarios } = estado.context;
+  const { serviceId, serviceName, horarios, diaLabel } = estado.context;
   const opcoesPlanas = [];
   horarios.forEach((h) => { h.profissionais.forEach((p) => { opcoesPlanas.push({ horario: h.horario, horarioISO: h.horarioISO, providerId: p.id, providerName: p.name }); }); });
   const listaOpcoes = opcoesPlanas.map((o, i) => i + ": " + o.horario + " com " + o.providerName).join("\n");
@@ -296,23 +298,68 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   }
 
   const customerName = lead?.name || null;
+  const profissionalFavorita = lead?.profissional_favorita || null;
+
+  // Se a profissional escolhida é diferente da favorita, confirma antes
+  if (profissionalFavorita && escolha.providerName.toLowerCase() !== profissionalFavorita.toLowerCase()) {
+    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente tem como profissional favorita a " + profissionalFavorita + ", mas o horario escolhido (" + escolha.horario + " em " + diaLabel + ") é com a " + escolha.providerName + ". Pergunte de forma natural se ele confirma o agendamento com a " + escolha.providerName + " ou se prefere outro horario com a " + profissionalFavorita + "." }] });
+    await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+    await setConversationState({
+      companyId: company.id, customerPhone,
+      step: STEP_CONFIRMAR_PROFISSIONAL,
+      context: { ...estado.context, escolha, customerName }
+    });
+    return;
+  }
+
+  await finalizarAgendamento({ company, customerPhone, escolha, serviceId, serviceName, diaLabel, customerName, systemPrompt });
+  await clearConversationState({ companyId: company.id, customerPhone });
+}
+
+async function processarConfirmacaoProfissional({ company, customerPhone, customerMessage, estado, systemPrompt, lead }) {
+  const { escolha, serviceId, serviceName, diaLabel, customerName } = estado.context;
+  const msgUpper = customerMessage.trim().toUpperCase();
+
+  const confirma = msgUpper.includes("SIM") || msgUpper.includes("PODE") || msgUpper.includes("OK") || msgUpper.includes("CONFIRM") || msgUpper.includes("TUDO BEM");
+
+  if (confirma) {
+    await finalizarAgendamento({ company, customerPhone, escolha, serviceId, serviceName, diaLabel, customerName, systemPrompt });
+    await clearConversationState({ companyId: company.id, customerPhone });
+  } else {
+    // Cliente não quer — volta para mostrar horários com a profissional favorita
+    const profissionalFavorita = lead?.profissional_favorita || null;
+    const { horarios } = estado.context;
+
+    // Filtra horários apenas com a profissional favorita
+    const horariosFavorita = horarios
+      .map((h) => ({ ...h, profissionais: h.profissionais.filter((p) => p.name.toLowerCase() === (profissionalFavorita || "").toLowerCase()) }))
+      .filter((h) => h.profissionais.length > 0);
+
+    if (horariosFavorita.length === 0) {
+      await oferecerListaEspera({ company, customerPhone, customerName, serviceId, serviceName, systemPrompt });
+    } else {
+      const listaHorarios = horariosFavorita.map((h) => h.horario + ": " + h.profissionais.map((p) => p.name).join(", ")).join("\n");
+      const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente prefere " + profissionalFavorita + ". Mostre os horarios disponiveis com ela em " + diaLabel + " de forma natural:\n" + listaHorarios + "\nPergunte qual horario prefere." }] });
+      await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+      await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: estado.context });
+    }
+  }
+}
+
+async function finalizarAgendamento({ company, customerPhone, escolha, serviceId, serviceName, diaLabel, customerName, systemPrompt }) {
   await criarAgendamento({ company, provider: { id: escolha.providerId, name: escolha.providerName, phone: null }, service: { id: serviceId, name: serviceName }, scheduledAt: new Date(escolha.horarioISO), customerPhone, customerName });
-  await advanceStage({ companyId: company.id, customerPhone });
 
-  const { data: providerData } = await supabase
-    .from("tp_providers")
-    .select("phone")
-    .eq("id", escolha.providerId)
-    .single();
+  const { data: lead } = await supabase.from("tp_leads").select("stage").eq("company_id", company.id).eq("phone", customerPhone).single();
+  if (lead?.stage === "frio") await supabase.from("tp_leads").update({ stage: "quente" }).eq("company_id", company.id).eq("phone", customerPhone);
 
+  const { data: providerData } = await supabase.from("tp_providers").select("phone").eq("id", escolha.providerId).single();
   if (providerData?.phone) {
-    const msgProfissional = "Olá " + escolha.providerName + "! Você tem um novo agendamento: " + serviceName + " com " + (customerName || customerPhone) + " em " + estado.context.diaLabel + " às " + escolha.horario + ". Confirma? Responda SIM ou NÃO.";
+    const msgProfissional = "Olá " + escolha.providerName + "! Você tem um novo agendamento: " + serviceName + " com " + (customerName || customerPhone) + " em " + diaLabel + " às " + escolha.horario + ". Confirma? Responda SIM ou NÃO.";
     await sendTextMessage({ to: providerData.phone, message: msgProfissional, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   }
 
-  const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente " + (customerName || "") + " confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + estado.context.diaLabel + ". Confirme de forma calorosa, sem cumprimento inicial, sem emoji excessivo, informando que avisara quando a profissional confirmar." }] });
+  const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente " + (customerName || "") + " confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + diaLabel + ". Confirme de forma calorosa, sem cumprimento inicial, sem emoji excessivo, informando que avisara quando a profissional confirmar." }] });
   await sendTextMessage({ to: customerPhone, message: confirmacao, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-  await clearConversationState({ companyId: company.id, customerPhone });
 }
 
 async function iniciarCancelamento({ company, customerPhone, systemPrompt }) {
