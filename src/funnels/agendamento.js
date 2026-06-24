@@ -279,6 +279,24 @@ async function processarEscolhaDia({ company, customerPhone, customerMessage, es
 
 async function processarEscolhaHorario({ company, customerPhone, customerMessage, estado, systemPrompt, lead }) {
   const { serviceId, serviceName, horarios, diaLabel } = estado.context;
+
+  // Verifica se o cliente mencionou um dia diferente
+  const dias = listarProximosDias(6);
+  const novoDia = await identificarDiaNaMensagem(customerMessage, dias);
+  if (novoDia && novoDia.label !== diaLabel) {
+    const novosHorarios = await horariosDoDia({ serviceId, companyId: company.id, data: new Date(novoDia.iso || novoDia.data) });
+    if (novosHorarios.length === 0) {
+      const customerName = lead?.name || null;
+      await oferecerListaEspera({ company, customerPhone, customerName, serviceId, serviceName, systemPrompt });
+      return;
+    }
+    const listaHorarios = novosHorarios.map((h) => h.horario + ": " + h.profissionais.map((p) => p.name).join(", ")).join("\n");
+    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente quer ver horarios de " + novoDia.label + " para " + serviceName + ". Mostre os horarios livres de forma natural, sem markdown:\n" + listaHorarios + "\nPergunte qual horario e profissional ele prefere." }] });
+    await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+    await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: { serviceId, serviceName, customerName: lead?.name || null, diaLabel: novoDia.label, horarios: novosHorarios.map((h) => ({ horario: h.horario, horarioISO: h.horarioISO, profissionais: h.profissionais })) } });
+    return;
+  }
+
   const opcoesPlanas = [];
   horarios.forEach((h) => { h.profissionais.forEach((p) => { opcoesPlanas.push({ horario: h.horario, horarioISO: h.horarioISO, providerId: p.id, providerName: p.name }); }); });
   const listaOpcoes = opcoesPlanas.map((o, i) => i + ": " + o.horario + " com " + o.providerName).join("\n");
@@ -300,7 +318,6 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   const customerName = lead?.name || null;
   const profissionalFavorita = lead?.profissional_favorita || null;
 
-  // Se a profissional escolhida é diferente da favorita, confirma antes
   if (profissionalFavorita && escolha.providerName.toLowerCase() !== profissionalFavorita.toLowerCase()) {
     const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente tem como profissional favorita a " + profissionalFavorita + ", mas o horario escolhido (" + escolha.horario + " em " + diaLabel + ") é com a " + escolha.providerName + ". Pergunte de forma natural se ele confirma o agendamento com a " + escolha.providerName + " ou se prefere outro horario com a " + profissionalFavorita + "." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
@@ -317,20 +334,15 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
 }
 
 async function processarConfirmacaoProfissional({ company, customerPhone, customerMessage, estado, systemPrompt, lead }) {
-  const { escolha, serviceId, serviceName, diaLabel, customerName } = estado.context;
+  const { escolha, serviceId, serviceName, diaLabel, customerName, horarios } = estado.context;
   const msgUpper = customerMessage.trim().toUpperCase();
-
   const confirma = msgUpper.includes("SIM") || msgUpper.includes("PODE") || msgUpper.includes("OK") || msgUpper.includes("CONFIRM") || msgUpper.includes("TUDO BEM");
 
   if (confirma) {
     await finalizarAgendamento({ company, customerPhone, escolha, serviceId, serviceName, diaLabel, customerName, systemPrompt });
     await clearConversationState({ companyId: company.id, customerPhone });
   } else {
-    // Cliente não quer — volta para mostrar horários com a profissional favorita
     const profissionalFavorita = lead?.profissional_favorita || null;
-    const { horarios } = estado.context;
-
-    // Filtra horários apenas com a profissional favorita
     const horariosFavorita = horarios
       .map((h) => ({ ...h, profissionais: h.profissionais.filter((p) => p.name.toLowerCase() === (profissionalFavorita || "").toLowerCase()) }))
       .filter((h) => h.profissionais.length > 0);
@@ -341,16 +353,13 @@ async function processarConfirmacaoProfissional({ company, customerPhone, custom
       const listaHorarios = horariosFavorita.map((h) => h.horario + ": " + h.profissionais.map((p) => p.name).join(", ")).join("\n");
       const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente prefere " + profissionalFavorita + ". Mostre os horarios disponiveis com ela em " + diaLabel + " de forma natural:\n" + listaHorarios + "\nPergunte qual horario prefere." }] });
       await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-      await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: estado.context });
+      await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: { ...estado.context } });
     }
   }
 }
 
 async function finalizarAgendamento({ company, customerPhone, escolha, serviceId, serviceName, diaLabel, customerName, systemPrompt }) {
   await criarAgendamento({ company, provider: { id: escolha.providerId, name: escolha.providerName, phone: null }, service: { id: serviceId, name: serviceName }, scheduledAt: new Date(escolha.horarioISO), customerPhone, customerName });
-
-  const { data: lead } = await supabase.from("tp_leads").select("stage").eq("company_id", company.id).eq("phone", customerPhone).single();
-  if (lead?.stage === "frio") await supabase.from("tp_leads").update({ stage: "quente" }).eq("company_id", company.id).eq("phone", customerPhone);
 
   const { data: providerData } = await supabase.from("tp_providers").select("phone").eq("id", escolha.providerId).single();
   if (providerData?.phone) {
