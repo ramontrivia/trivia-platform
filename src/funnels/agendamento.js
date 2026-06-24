@@ -37,6 +37,17 @@ async function identificarDiaNaMensagem(customerMessage, dias) {
   return isNaN(idx) ? null : dias[idx] || null;
 }
 
+// Validação crítica — verifica se profissional realmente faz o serviço
+async function validarVinculoProfissionalServico(providerId, serviceId) {
+  const { data } = await supabase
+    .from("tp_provider_services")
+    .select("id")
+    .eq("provider_id", providerId)
+    .eq("service_id", serviceId)
+    .single();
+  return !!data;
+}
+
 export async function handleMessage({ company, incomingMessage }) {
   const customerPhone = incomingMessage.from;
   const customerMessage = incomingMessage.text;
@@ -315,6 +326,15 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
     return;
   }
 
+  // VALIDAÇÃO CRÍTICA — verifica se profissional realmente faz o serviço
+  const vinculoValido = await validarVinculoProfissionalServico(escolha.providerId, serviceId);
+  if (!vinculoValido) {
+    console.error("🚨 BLOQUEIO: tentativa de agendar " + escolha.providerName + " para " + serviceName + " — vínculo não existe!");
+    const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "Houve um erro interno ao tentar agendar. Peça desculpas de forma calorosa e solicite que o cliente escolha novamente o horário e a profissional." }] });
+    await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+    return;
+  }
+
   const customerName = lead?.name || null;
   const profissionalFavorita = lead?.profissional_favorita || null;
 
@@ -359,6 +379,14 @@ async function processarConfirmacaoProfissional({ company, customerPhone, custom
 }
 
 async function finalizarAgendamento({ company, customerPhone, escolha, serviceId, serviceName, diaLabel, customerName, systemPrompt }) {
+  // VALIDAÇÃO FINAL — dupla verificação antes de gravar no banco
+  const vinculoValido = await validarVinculoProfissionalServico(escolha.providerId, serviceId);
+  if (!vinculoValido) {
+    console.error("🚨 BLOQUEIO FINAL: tentativa de gravar agendamento inválido — " + escolha.providerName + " não faz " + serviceName);
+    await sendTextMessage({ to: customerPhone, message: "Desculpe, houve um problema ao confirmar seu agendamento. Por favor, escolha novamente o horário e a profissional.", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+    return;
+  }
+
   await criarAgendamento({ company, provider: { id: escolha.providerId, name: escolha.providerName, phone: null }, service: { id: serviceId, name: serviceName }, scheduledAt: new Date(escolha.horarioISO), customerPhone, customerName });
 
   const { data: providerData } = await supabase.from("tp_providers").select("phone").eq("id", escolha.providerId).single();
