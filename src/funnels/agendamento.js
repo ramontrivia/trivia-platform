@@ -13,6 +13,7 @@ import { supabase } from "../services/supabase.js";
 import { isAdmin, enviarRelatorioAdmin, isProvider, enviarAgendaProfissional } from "../flows/admin.js";
 import { iniciarReagendamento, processarReagendamento } from "../modules/reagendamento.js";
 import { oferecerListaEspera, processarRespostaListaEspera, notificarListaEspera } from "../modules/listaEspera.js";
+import { processarAvaliacao } from "../modules/avaliacao.js";
 
 const STEP_COLETAR_NOME = "agendamento_coletar_nome";
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
@@ -50,6 +51,13 @@ export async function handleMessage({ company, incomingMessage }) {
       await processarRespostaProfissional({ company, customerPhone, provider, resposta: msgUpper });
       return;
     }
+  }
+
+  // Verifica se é uma resposta de avaliação (número de 1 a 5)
+  const notaAvaliacao = parseInt(customerMessage.trim(), 10);
+  if (!isNaN(notaAvaliacao) && notaAvaliacao >= 1 && notaAvaliacao <= 5) {
+    const avaliou = await processarAvaliacao({ company, customerPhone, customerMessage });
+    if (avaliou) return;
   }
 
   const lead = await getOrCreateLead({ companyId: company.id, customerPhone });
@@ -182,7 +190,6 @@ async function processarRespostaProfissional({ company, customerPhone, provider,
     await supabase.from("tp_appointments").update({ status: "cancelado" }).eq("id", agendamento.id);
     await sendTextMessage({ to: customerPhone, message: "Entendido, " + provider.name + ". Agendamento cancelado.", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     await sendTextMessage({ to: agendamento.customer_phone, message: "Olá! Infelizmente " + provider.name + " não poderá atender seu agendamento de " + nomeServico + " em " + data + " às " + hora + ". Entre em contato para remarcar. 💙", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-    // Notifica lista de espera quando profissional cancela
     await notificarListaEspera({ company, serviceId: agendamento.service_id, serviceName: nomeServico });
   }
 }
@@ -223,7 +230,6 @@ async function processarEscolhaDia({ company, customerPhone, customerMessage, es
 
   const horarios = await horariosDoDia({ serviceId, companyId: company.id, data: new Date(diaEscolhido.iso) });
   if (horarios.length === 0) {
-    // Sem horários — oferecer lista de espera
     await oferecerListaEspera({ company, customerPhone, customerName, serviceId, serviceName, systemPrompt });
     return;
   }
@@ -368,7 +374,6 @@ async function processarCancelamento({ company, customerPhone, customerMessage, 
       await sendTextMessage({ to: providerData[0].phone, message: msgProfissional, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     }
 
-    // Notifica lista de espera
     await notificarListaEspera({ company, serviceId: agendamento.serviceId, serviceName: agendamento.serviceName });
   }
 

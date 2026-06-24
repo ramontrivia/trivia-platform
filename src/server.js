@@ -4,6 +4,7 @@ import FormData from "form-data";
 import OpenAI from "openai";
 import { handleIncomingMessage } from "./core/orchestrator.js";
 import { enviarLembretes } from "./modules/lembrete.js";
+import { enviarPedidosAvaliacao } from "./modules/avaliacao.js";
 
 const app = express();
 app.use(express.json());
@@ -12,9 +13,6 @@ const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// -------------------------------------------------------
-// Função: baixa o áudio da Meta e transcreve com Whisper
-// -------------------------------------------------------
 async function transcreverAudio(mediaId, token) {
   const metaRes = await fetch(
     `https://graph.facebook.com/v19.0/${mediaId}`,
@@ -51,9 +49,6 @@ async function transcreverAudio(mediaId, token) {
   return whisperData.text || "";
 }
 
-// -------------------------------------------------------
-// GET /webhook — verificação da Meta
-// -------------------------------------------------------
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -66,9 +61,6 @@ app.get("/webhook", (req, res) => {
   }
 });
 
-// -------------------------------------------------------
-// POST /webhook — mensagens do WhatsApp
-// -------------------------------------------------------
 app.post("/webhook", async (req, res) => {
   try {
     const entry = req.body.entry?.[0];
@@ -113,21 +105,37 @@ app.post("/webhook", async (req, res) => {
 });
 
 // -------------------------------------------------------
-// POST /lembrete — disparado pelo N8N todo dia às 18h
+// POST /lembrete — disparado pelo N8N todo dia às 8h
 // -------------------------------------------------------
 app.post("/lembrete", async (req, res) => {
   try {
-    // Verificação simples de segurança
     const token = req.headers["x-trivia-token"];
     if (token !== process.env.VERIFY_TOKEN) {
       return res.status(401).json({ erro: "Token inválido" });
     }
-
     console.log("⏰ Endpoint /lembrete chamado pelo N8N");
     const resultado = await enviarLembretes();
     res.status(200).json(resultado);
   } catch (error) {
     console.error("Erro no endpoint /lembrete:", error.message);
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// -------------------------------------------------------
+// POST /avaliacao — disparado pelo N8N a cada hora
+// -------------------------------------------------------
+app.post("/avaliacao", async (req, res) => {
+  try {
+    const token = req.headers["x-trivia-token"];
+    if (token !== process.env.VERIFY_TOKEN) {
+      return res.status(401).json({ erro: "Token inválido" });
+    }
+    console.log("⭐ Endpoint /avaliacao chamado pelo N8N");
+    const resultado = await enviarPedidosAvaliacao();
+    res.status(200).json(resultado);
+  } catch (error) {
+    console.error("Erro no endpoint /avaliacao:", error.message);
     res.status(500).json({ erro: error.message });
   }
 });
