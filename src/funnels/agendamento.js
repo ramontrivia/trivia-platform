@@ -15,6 +15,7 @@ import { iniciarReagendamento, processarReagendamento } from "../modules/reagend
 import { oferecerListaEspera, processarRespostaListaEspera, notificarListaEspera } from "../modules/listaEspera.js";
 import { processarAvaliacao } from "../modules/avaliacao.js";
 import { analisarSentimento } from "../modules/sentimento.js";
+import { extrairEsalvarMemoria } from "../modules/memoriaRica.js";
 
 const STEP_COLETAR_NOME = "agendamento_coletar_nome";
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
@@ -67,6 +68,11 @@ export async function handleMessage({ company, incomingMessage }) {
   const memoria = await montarMemoriaCliente({ companyId: company.id, customerPhone, leadId: lead?.id });
   const systemPrompt = [knowledge, phaseKnowledge, memoria].filter(Boolean).join("\n\n");
   const estado = await getConversationState({ companyId: company.id, customerPhone });
+
+  // Extrai memória rica em background
+  if (lead?.id) {
+    extrairEsalvarMemoria({ companyId: company.id, customerPhone, customerMessage, leadId: lead.id }).catch(console.error);
+  }
 
   if (estado && estado.step === STEP_COLETAR_NOME) {
     await processarNome({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
@@ -381,7 +387,6 @@ async function processarCancelamento({ company, customerPhone, customerMessage, 
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await clearConversationState({ companyId: company.id, customerPhone });
 
-  // Analisa sentimento após cancelamento
   const customerName = lead?.name || null;
   analisarSentimento({ company, customerPhone, customerName, mensagens: [customerMessage] }).catch(console.error);
 }
@@ -396,7 +401,6 @@ async function responderComIA({ company, customerPhone, customerMessage, systemP
   });
   if (resposta) await sendTextMessage({ to: customerPhone, message: resposta, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
 
-  // Analisa sentimento em background
   const customerName = lead?.name || null;
   analisarSentimento({ company, customerPhone, customerName, mensagens: [customerMessage] }).catch(console.error);
 }
