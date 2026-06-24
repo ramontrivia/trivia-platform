@@ -1,10 +1,3 @@
-// =====================================================================
-// listaEspera.js
-// Módulo de lista de espera — quando não há horário disponível,
-// oferece ao cliente entrar na fila. Quando um agendamento é cancelado,
-// avisa automaticamente o primeiro da fila.
-// =====================================================================
-
 import { supabase } from "../services/supabase.js";
 import { sendTextMessage } from "../services/whatsapp.js";
 import { generateResponse } from "../services/openai.js";
@@ -15,7 +8,7 @@ export async function oferecerListaEspera({ company, customerPhone, customerName
     systemPrompt,
     conversationHistory: [{
       role: "user",
-      content: "Nao ha horarios disponiveis para " + serviceName + " no momento. Ofereça ao cliente entrar na lista de espera de forma acolhedora — quando surgir um horário disponível, ela será a primeira a saber. Pergunte se deseja entrar na lista."
+      content: "Nao ha horarios disponiveis para " + serviceName + " no momento. Ofereça ao cliente entrar na lista de espera de forma acolhedora — quando surgir um horário disponível, ela será a primeira a saber. Pergunte se deseja entrar na lista. Seja breve."
     }]
   });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
@@ -31,13 +24,10 @@ export async function oferecerListaEspera({ company, customerPhone, customerName
 export async function processarRespostaListaEspera({ company, customerPhone, customerMessage, estado, systemPrompt }) {
   const { serviceId, serviceName, customerName } = estado.context;
 
-  const prompt = "O cliente respondeu: \"" + customerMessage + "\". Ele quer entrar na lista de espera? Responda apenas: sim ou nao";
-  const resposta = await generateResponse({
-    systemPrompt: "Voce e um classificador preciso. Responda apenas sim ou nao.",
-    conversationHistory: [{ role: "user", content: prompt }]
-  });
+  const msgUpper = customerMessage.trim().toUpperCase();
+  const quer = msgUpper.includes("SIM") || msgUpper.includes("QUERO") || msgUpper.includes("PODE") || msgUpper.includes("OK") || msgUpper.includes("ISSO") || msgUpper.includes("CLARO") || msgUpper.includes("SIM") || msgUpper === "S";
 
-  if (resposta && resposta.trim().toLowerCase() === "sim") {
+  if (quer) {
     await supabase.from("tp_waitlist").insert({
       company_id: company.id,
       customer_phone: customerPhone,
@@ -69,7 +59,6 @@ export async function processarRespostaListaEspera({ company, customerPhone, cus
 }
 
 export async function notificarListaEspera({ company, serviceId, serviceName }) {
-  // Busca o primeiro da fila para este serviço
   const { data: fila } = await supabase
     .from("tp_waitlist")
     .select("id, customer_phone, customer_name")
@@ -92,7 +81,6 @@ export async function notificarListaEspera({ company, serviceId, serviceName }) 
     whatsappToken: company.whatsapp_token
   });
 
-  // Remove da lista de espera
   await supabase.from("tp_waitlist").delete().eq("id", primeiro.id);
 
   console.log("✅ Lista de espera: notificado", primeiro.customer_phone, "para", serviceName);
