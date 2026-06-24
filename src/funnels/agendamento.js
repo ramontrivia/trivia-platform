@@ -24,6 +24,19 @@ const STEP_ESCOLHER_HORARIO = "agendamento_escolher_horario";
 const TELEFONE_RECEPCAO = "5531999999999";
 const LINK_RECEPCAO = "https://wa.me/" + TELEFONE_RECEPCAO;
 
+// Tenta identificar dia mencionado na mensagem
+async function identificarDiaNaMensagem(customerMessage, dias) {
+  const listaDias = dias.map((d, i) => i + ": " + d.label).join("\n");
+  const prompt = "Dias disponiveis:\n" + listaDias + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nO cliente mencionou algum dia especifico? Responda APENAS o indice do dia. Se nao mencionou nenhum dia: nenhum";
+  const resposta = await generateResponse({
+    systemPrompt: "Voce e um classificador preciso. Responda apenas o numero ou nenhum.",
+    conversationHistory: [{ role: "user", content: prompt }]
+  });
+  if (!resposta || resposta.trim().toLowerCase() === "nenhum") return null;
+  const idx = parseInt(resposta.trim(), 10);
+  return isNaN(idx) ? null : dias[idx] || null;
+}
+
 export async function handleMessage({ company, incomingMessage }) {
   const customerPhone = incomingMessage.from;
   const customerMessage = incomingMessage.text;
@@ -69,7 +82,6 @@ export async function handleMessage({ company, incomingMessage }) {
   const systemPrompt = [knowledge, phaseKnowledge, memoria].filter(Boolean).join("\n\n");
   const estado = await getConversationState({ companyId: company.id, customerPhone });
 
-  // Extrai memória rica em background
   if (lead?.id) {
     extrairEsalvarMemoria({ companyId: company.id, customerPhone, customerMessage, leadId: lead.id }).catch(console.error);
   }
@@ -152,8 +164,25 @@ export async function handleMessage({ company, incomingMessage }) {
 
   if (phase === "frio") await advanceStage({ companyId: company.id, customerPhone });
 
+  // Tenta identificar se o cliente já mencionou um dia
+  const dias = listarProximosDias(6);
+  const diaJaMencionado = await identificarDiaNaMensagem(customerMessage, dias);
+
   if (lead?.name) {
-    await mostrarDias({ company, customerPhone, service, systemPrompt, lead });
+    if (diaJaMencionado) {
+      // Cliente já informou o dia — vai direto para os horários
+      const horarios = await horariosDoDia({ serviceId: service.id, companyId: company.id, data: new Date(diaJaMencionado.iso || diaJaMencionado.data) });
+      if (horarios.length === 0) {
+        await oferecerListaEspera({ company, customerPhone, customerName: lead.name, serviceId: service.id, serviceName: service.name, systemPrompt });
+        return;
+      }
+      const listaHorarios = horarios.map((h) => h.horario + ": " + h.profissionais.map((p) => p.name).join(", ")).join("\n");
+      const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente quer agendar " + service.name + " em " + diaJaMencionado.label + ". Mostre os horarios livres de forma natural, sem markdown:\n" + listaHorarios + "\nPergunte qual horario e profissional ele prefere. Deve informar TANTO o horario QUANTO a profissional." }] });
+      await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+      await setConversationState({ companyId: company.id, customerPhone, step: STEP_ESCOLHER_HORARIO, context: { serviceId: service.id, serviceName: service.name, customerName: lead.name, diaLabel: diaJaMencionado.label, horarios: horarios.map((h) => ({ horario: h.horario, horarioISO: h.horarioISO, profissionais: h.profissionais })) } });
+    } else {
+      await mostrarDias({ company, customerPhone, service, systemPrompt, lead });
+    }
   } else {
     const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente quer agendar " + service.name + ". Antes de mostrar os horarios, peca o nome dele de forma natural e acolhedora." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
