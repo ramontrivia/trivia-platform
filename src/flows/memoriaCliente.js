@@ -89,6 +89,5 @@ export async function montarMemoriaCliente({ companyId, customerPhone, leadId })
     interacoes.reverse().forEach((i) => { if (i.message) partes.push("- " + i.message); });
   }
 
-  partes.push("\nUse a memoria com naturalidade. Chame o cliente pelo nome sempre que possivel. Use as preferencias para personalizar o atendimento.");
-  return partes.join("\n");
+  ppartes.push("\nINSTRUÇÕES IMPORTANTES:\n- Chame o cliente pelo nome sempre\n- Se tiver horario_preferido, PRIORIZE mostrar horários nesse período\n- Se tiver profissional_favorita, PRIORIZE sugerir essa profissional\n- Se tiver notas_pessoais, mencione naturalmente quando relevante (ex: 'para o seu casamento em julho')\n- Use essas informações de forma natural, como uma recepcionista que conhece bem o cliente");
 }
