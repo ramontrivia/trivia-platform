@@ -57,7 +57,7 @@ export async function enviarLembretes() {
       const nomeProfissional = mapaProviders[agendamento.provider_id] || "profissional";
       const hora = new Date(agendamento.scheduled_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-      const mensagem = `Bom dia, ${nomeCliente}! ☀️ Hoje é dia de se cuidar! 💇‍♀️\n\nSeu ${nomeServico} com ${nomeProfissional} está confirmado para às ${hora}.\n\nEstamos ansiosas para te receber no Espaço chanell! Te esperamos! 🌸`;
+      const mensagem = `Bom dia, ${nomeCliente}! ☀️ Hoje é dia de se cuidar! 💇‍♀️\n\nSeu ${nomeServico} com ${nomeProfissional} está confirmado para às ${hora}.\n\nEstamos ansiosas para te receber no Espaço Chanell! Te esperamos! 🌸`;
 
       await sendTextMessage({
         to: agendamento.customer_phone,
