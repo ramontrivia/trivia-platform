@@ -14,6 +14,7 @@ import { isAdmin, enviarRelatorioAdmin, isProvider, enviarAgendaProfissional } f
 import { iniciarReagendamento, processarReagendamento } from "../modules/reagendamento.js";
 import { oferecerListaEspera, processarRespostaListaEspera, notificarListaEspera } from "../modules/listaEspera.js";
 import { processarAvaliacao } from "../modules/avaliacao.js";
+import { analisarSentimento } from "../modules/sentimento.js";
 
 const STEP_COLETAR_NOME = "agendamento_coletar_nome";
 const STEP_ESCOLHER_DIA = "agendamento_escolher_dia";
@@ -53,7 +54,6 @@ export async function handleMessage({ company, incomingMessage }) {
     }
   }
 
-  // Verifica se é uma resposta de avaliação (número de 1 a 5)
   const notaAvaliacao = parseInt(customerMessage.trim(), 10);
   if (!isNaN(notaAvaliacao) && notaAvaliacao >= 1 && notaAvaliacao <= 5) {
     const avaliou = await processarAvaliacao({ company, customerPhone, customerMessage });
@@ -81,7 +81,7 @@ export async function handleMessage({ company, incomingMessage }) {
     return;
   }
   if (estado && estado.step === "agendamento_cancelar") {
-    await processarCancelamento({ company, customerPhone, customerMessage, estado, systemPrompt });
+    await processarCancelamento({ company, customerPhone, customerMessage, estado, systemPrompt, lead });
     return;
   }
   if (estado && (estado.step === "reagendar_escolher_agendamento" || estado.step === "reagendar_escolher_dia" || estado.step === "reagendar_escolher_horario")) {
@@ -278,6 +278,20 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   const confirmacao = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente " + (customerName || "") + " confirmou agendamento de " + serviceName + " com " + escolha.providerName + " as " + escolha.horario + " em " + estado.context.diaLabel + ". Confirme de forma calorosa, sem cumprimento inicial, sem emoji excessivo, informando que avisara quando a profissional confirmar." }] });
   await sendTextMessage({ to: customerPhone, message: confirmacao, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await clearConversationState({ companyId: company.id, customerPhone });
+
+  // Analisa sentimento após agendamento
+  const { data: interacoes } = await supabase
+    .from("tp_lead_interactions")
+    .select("message")
+    .eq("company_id", company.id)
+    .eq("customer_phone", customerPhone)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (interacoes && interacoes.length > 0) {
+    const mensagens = interacoes.reverse().map((i) => i.message).filter(Boolean);
+    analisarSentimento({ company, customerPhone, customerName, mensagens }).catch(console.error);
+  }
 }
 
 async function iniciarCancelamento({ company, customerPhone, systemPrompt }) {
@@ -333,7 +347,7 @@ async function iniciarCancelamento({ company, customerPhone, systemPrompt }) {
   });
 }
 
-async function processarCancelamento({ company, customerPhone, customerMessage, estado, systemPrompt }) {
+async function processarCancelamento({ company, customerPhone, customerMessage, estado, systemPrompt, lead }) {
   const { agendamentos } = estado.context;
   const listaOpcoes = agendamentos.map((a) => a.indice + ": " + a.service + " com " + a.provider + " em " + a.data).join("\n");
   const prompt = "Agendamentos disponiveis para cancelar:\n" + listaOpcoes + "\n\nMensagem do cliente: \"" + customerMessage + "\"\n\nO cliente quer cancelar qual(is)? Responda com os indices separados por virgula. Se quiser cancelar TODOS responda: todos. Se nao identificar: nenhum";
@@ -380,6 +394,21 @@ async function processarCancelamento({ company, customerPhone, customerMessage, 
   const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente cancelou " + agendamentosParaCancelar.length + " agendamento(s) com sucesso. Confirme de forma calorosa e pergunte se precisa de mais alguma coisa." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
   await clearConversationState({ companyId: company.id, customerPhone });
+
+  // Analisa sentimento após cancelamento
+  const { data: interacoes } = await supabase
+    .from("tp_lead_interactions")
+    .select("message")
+    .eq("company_id", company.id)
+    .eq("customer_phone", customerPhone)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (interacoes && interacoes.length > 0) {
+    const customerName = lead?.name || null;
+    const mensagens = interacoes.reverse().map((i) => i.message).filter(Boolean);
+    analisarSentimento({ company, customerPhone, customerName, mensagens }).catch(console.error);
+  }
 }
 
 async function responderComIA({ company, customerPhone, customerMessage, systemPrompt }) {
