@@ -24,8 +24,9 @@ export async function classificarIntencao(customerMessage) {
     conversationHistory: [{ role: "user", content: prompt }],
   });
 
-  if (!resposta) return "conversar";
-  const intencao = resposta.trim().toLowerCase();
+  const intencao = resposta ? resposta.trim().toLowerCase() : "conversar";
+  console.log("🎯 Intenção classificada:", intencao, "| Mensagem:", customerMessage);
+
   const validas = ["listar_servicos", "listar_profissionais", "agendar", "cancelar", "reagendar", "humano", "conversar"];
   return validas.includes(intencao) ? intencao : "conversar";
 }
