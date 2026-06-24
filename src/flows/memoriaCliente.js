@@ -89,5 +89,12 @@ export async function montarMemoriaCliente({ companyId, customerPhone, leadId })
     interacoes.reverse().forEach((i) => { if (i.message) partes.push("- " + i.message); });
   }
 
-  ppartes.push("\nINSTRUÇÕES IMPORTANTES:\n- Chame o cliente pelo nome sempre\n- Se tiver horario_preferido, PRIORIZE mostrar horários nesse período\n- Se tiver profissional_favorita, PRIORIZE sugerir essa profissional\n- Se tiver notas_pessoais, mencione naturalmente quando relevante (ex: 'para o seu casamento em julho')\n- Use essas informações de forma natural, como uma recepcionista que conhece bem o cliente");
+  partes.push("\nINSTRUÇÕES IMPORTANTES:");
+  partes.push("- Chame o cliente pelo nome sempre");
+  partes.push("- Se tiver horario_preferido, PRIORIZE mostrar horários nesse período");
+  partes.push("- Se tiver profissional_favorita, PRIORIZE sugerir essa profissional");
+  partes.push("- Se tiver notas_pessoais, mencione naturalmente quando relevante (ex: para o seu casamento em julho)");
+  partes.push("- Use essas informações de forma natural, como uma recepcionista que conhece bem o cliente");
+
+  return partes.join("\n");
 }
