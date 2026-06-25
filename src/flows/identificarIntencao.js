@@ -15,21 +15,41 @@ export async function identificarServico({ companyId, customerMessage }) {
   const listaServicos = services.map((s) => `- ${s.name} (id: ${s.id})`).join("\n");
 
   const prompt = `
-Você recebe a mensagem de um cliente de um salão de beleza e precisa
-identificar qual serviço, dentre a lista abaixo, ele está pedindo.
+Você é um especialista em salões de beleza brasileiro. Um cliente enviou uma mensagem e você precisa identificar qual serviço ele deseja.
 
-Lista de serviços disponíveis:
+IMPORTANTE: Clientes falam de formas muito variadas. Use seu conhecimento para interpretar:
+- "quero cortar o cabelo", "tirar dois dedos", "dar uma aparada", "fazer um corte", "quero um cortinho" → Corte
+- "fazer as unhas", "fazer a mão", "quero uma manicure", "pintar as unhas das mãos" → Mão
+- "fazer o pé", "pedicure", "pintar as unhas dos pés" → Pé
+- "mão e pé", "fazer as unhas todas", "manicure e pedicure" → Pé e Mão
+- "fazer as sobrancelhas", "dar um jeito nas sobrancelhas", "sobrancelha" → Sobrancelha
+- "fazer escova", "alisar o cabelo", "quero uma escova" → Escova
+- "fazer um penteado", "arrumar o cabelo", "quero um penteado especial" → Penteado
+- "colorir o cabelo", "tingir", "pintar o cabelo", "quero mudar a cor" → Coloração
+- "fazer mechas", "luzes", "californianas" → Mechas
+- "fazer progressiva", "progressiva brasileira", "alisar definitivo" → Progressiva
+- "fazer botox capilar", "botox no cabelo" → Botox
+- "fazer selagem", "selagem capilar" → Selagem
+- "quero um tratamento no cabelo", "hidratação" → Tratamento Capilar
+- "fazer depilação da perna", "depilar as pernas" → Perna
+- "depilar a virilha", "depilação íntima" → Virilha
+- "depilação corporal", "depilar o corpo" → Corporal
+- "fazer maquiagem", "quero me maquiar", "make" → Maquiagem
+- "fazer facial", "limpeza de pele", "cuidar da pele do rosto" → Facial
+- "fazer buco", "buço", "depilação do buço" → Buco
+- "prime liss", "primeliss" → Prime Liss
+
+Lista de serviços disponíveis neste salão:
 ${listaServicos}
 
 Mensagem do cliente: "${customerMessage}"
 
 Responda APENAS com o id do serviço identificado (apenas o número).
-Se não conseguir identificar nenhum serviço com confiança, responda
-exatamente: nenhum
+Se não conseguir identificar nenhum serviço com confiança, responda exatamente: nenhum
 `.trim();
 
   const resposta = await generateResponse({
-    systemPrompt: "Você é um classificador preciso. Responda apenas o que foi pedido, sem explicações.",
+    systemPrompt: "Você é um classificador preciso de serviços de salão de beleza. Responda apenas o número do id ou nenhum.",
     conversationHistory: [{ role: "user", content: prompt }],
   });
 
@@ -44,12 +64,10 @@ exatamente: nenhum
     return null;
   }
 
-  // Verifica se é serviço terceirizado
   if (service.terceirizado) {
     return { service, hasProvider: false, terceirizado: true };
   }
 
-  // Checa se existe algum prestador vinculado a esse serviço
   const { data: vinculos } = await supabase
     .from("tp_provider_services")
     .select("provider_id")
