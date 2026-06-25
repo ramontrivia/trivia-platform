@@ -6,6 +6,7 @@ import { handleIncomingMessage } from "./core/orchestrator.js";
 import { enviarLembretes } from "./modules/lembrete.js";
 import { enviarPedidosAvaliacao } from "./modules/avaliacao.js";
 import { reativarClientesInativos } from "./modules/reativacao.js";
+import { enviarRelatorioSemanal, enviarPreviaSemanal } from "./modules/relatorioSemanal.js";
 
 const app = express();
 app.use(express.json());
@@ -155,6 +156,42 @@ app.post("/reativacao", async (req, res) => {
     res.status(200).json(resultado);
   } catch (error) {
     console.error("Erro no endpoint /reativacao:", error.message);
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// -------------------------------------------------------
+// POST /relatorio-semanal — disparado pelo N8N domingo 14h
+// -------------------------------------------------------
+app.post("/relatorio-semanal", async (req, res) => {
+  try {
+    const token = req.headers["x-trivia-token"];
+    if (token !== process.env.VERIFY_TOKEN) {
+      return res.status(401).json({ erro: "Token inválido" });
+    }
+    console.log("📊 Endpoint /relatorio-semanal chamado pelo N8N");
+    const resultado = await enviarRelatorioSemanal();
+    res.status(200).json(resultado);
+  } catch (error) {
+    console.error("Erro no endpoint /relatorio-semanal:", error.message);
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// -------------------------------------------------------
+// POST /previa-semanal — disparado pelo N8N segunda 18h
+// -------------------------------------------------------
+app.post("/previa-semanal", async (req, res) => {
+  try {
+    const token = req.headers["x-trivia-token"];
+    if (token !== process.env.VERIFY_TOKEN) {
+      return res.status(401).json({ erro: "Token inválido" });
+    }
+    console.log("📅 Endpoint /previa-semanal chamado pelo N8N");
+    const resultado = await enviarPreviaSemanal();
+    res.status(200).json(resultado);
+  } catch (error) {
+    console.error("Erro no endpoint /previa-semanal:", error.message);
     res.status(500).json({ erro: error.message });
   }
 });
