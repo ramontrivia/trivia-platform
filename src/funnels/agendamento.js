@@ -153,7 +153,7 @@ export async function handleMessage({ company, incomingMessage }) {
     return;
   }
   if (intencao === "humano") {
-    await direcionarRecepcao({ company, customerPhone, customerMessage, systemPrompt, lead });
+    await direcionarRecepcao({ company, customerPhone, customerMessage, systemPrompt, lead, motivo: "atendimento humano solicitado pelo cliente" });
     return;
   }
 
@@ -208,20 +208,24 @@ async function direcionarRecepcao({ company, customerPhone, customerMessage, sys
   const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente precisa de atendimento especializado. Informe de forma calorosa que nossa equipe vai entrar em contato em breve para resolver. Seja breve e acolhedora." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
 
-  // Busca histórico da conversa
-  const { data: interacoes } = await supabase
-    .from("tp_lead_interactions")
-    .select("message, created_at")
-    .eq("company_id", company.id)
-    .eq("customer_phone", customerPhone)
-    .order("created_at", { ascending: false })
-    .limit(8);
+  // Busca histórico pelo lead_id
+  let historico = "Sem histórico disponível";
+  if (lead?.id) {
+    const { data: interacoes } = await supabase
+      .from("tp_lead_interactions")
+      .select("message, created_at")
+      .eq("lead_id", lead.id)
+      .order("created_at", { ascending: false })
+      .limit(8);
 
-  const historico = (interacoes || [])
-    .reverse()
-    .map((i) => i.message)
-    .filter(Boolean)
-    .join("\n");
+    if (interacoes && interacoes.length > 0) {
+      historico = interacoes
+        .reverse()
+        .map((i) => i.message)
+        .filter(Boolean)
+        .join("\n");
+    }
+  }
 
   const nomeCliente = lead?.name || customerPhone;
   const motivoTexto = motivo || "atendimento humano solicitado pelo cliente";
@@ -232,7 +236,7 @@ async function direcionarRecepcao({ company, customerPhone, customerMessage, sys
     "Telefone: " + customerPhone + "\n" +
     "Motivo: " + motivoTexto + "\n\n" +
     "📋 *Resumo da conversa:*\n" +
-    (historico || "Sem histórico disponível") + "\n\n" +
+    historico + "\n\n" +
     "Entre em contato agora! 📞";
 
   await sendTextMessage({
