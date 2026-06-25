@@ -93,7 +93,6 @@ export async function handleMessage({ company, incomingMessage }) {
   const estado = await getConversationState({ companyId: company.id, customerPhone });
 
   if (lead?.id) {
-    // Analisa sentimento em TODA mensagem — antes de qualquer fluxo
     analisarSentimento({ company, customerPhone, customerName: lead?.name || null, mensagens: [customerMessage] }).catch(console.error);
     extrairEsalvarMemoria({ companyId: company.id, customerPhone, customerMessage, leadId: lead.id }).catch(console.error);
   }
@@ -154,7 +153,7 @@ export async function handleMessage({ company, incomingMessage }) {
     return;
   }
   if (intencao === "humano") {
-    await direcionarRecepcao({ company, customerPhone, systemPrompt, motivo: "atendimento humano solicitado" });
+    await direcionarRecepcao({ company, customerPhone, customerMessage, systemPrompt, lead });
     return;
   }
 
@@ -169,12 +168,12 @@ export async function handleMessage({ company, incomingMessage }) {
   const { service, hasProvider, terceirizado } = identificacao;
 
   if (terceirizado) {
-    await direcionarRecepcao({ company, customerPhone, systemPrompt, motivo: "servico especial: " + service.name });
+    await direcionarRecepcao({ company, customerPhone, customerMessage, systemPrompt, lead, motivo: "servico especial: " + service.name });
     return;
   }
 
   if (!hasProvider) {
-    await direcionarRecepcao({ company, customerPhone, systemPrompt, motivo: "sem profissional: " + service.name });
+    await direcionarRecepcao({ company, customerPhone, customerMessage, systemPrompt, lead, motivo: "sem profissional: " + service.name });
     return;
   }
 
@@ -204,16 +203,46 @@ export async function handleMessage({ company, incomingMessage }) {
   }
 }
 
-async function direcionarRecepcao({ company, customerPhone, systemPrompt, motivo }) {
-  const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente precisa de atendimento especializado (" + motivo + "). Informe de forma calorosa que nossa equipe vai entrar em contato em breve para resolver. Seja breve e acolhedora." }] });
+async function direcionarRecepcao({ company, customerPhone, customerMessage, systemPrompt, lead, motivo }) {
+  // Avisa o cliente
+  const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente precisa de atendimento especializado. Informe de forma calorosa que nossa equipe vai entrar em contato em breve para resolver. Seja breve e acolhedora." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
 
-  // Avisa a recepção
-  const { data: lead } = await supabase.from("tp_leads").select("name").eq("company_id", company.id).eq("phone", customerPhone).single();
-  const nomeCliente = lead?.name || customerPhone;
-  const msgRecepcao = "📞 *SOLICITAÇÃO DE ATENDIMENTO HUMANO*\n\nCliente: " + nomeCliente + "\nTelefone: " + customerPhone + "\nMotivo: " + motivo + "\n\nEntre em contato!";
+  // Busca histórico da conversa
+  const { data: interacoes } = await supabase
+    .from("tp_lead_interactions")
+    .select("message, created_at")
+    .eq("company_id", company.id)
+    .eq("customer_phone", customerPhone)
+    .order("created_at", { ascending: false })
+    .limit(8);
 
-  await sendTextMessage({ to: TELEFONE_RECEPCAO, message: msgRecepcao, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+  const historico = (interacoes || [])
+    .reverse()
+    .map((i) => i.message)
+    .filter(Boolean)
+    .join("\n");
+
+  const nomeCliente = lead?.name || customerPhone;
+  const motivoTexto = motivo || "atendimento humano solicitado pelo cliente";
+
+  const msgRecepcao =
+    "📞 *SOLICITAÇÃO DE ATENDIMENTO HUMANO*\n\n" +
+    "Cliente: " + nomeCliente + "\n" +
+    "Telefone: " + customerPhone + "\n" +
+    "Motivo: " + motivoTexto + "\n\n" +
+    "📋 *Resumo da conversa:*\n" +
+    (historico || "Sem histórico disponível") + "\n\n" +
+    "Entre em contato agora! 📞";
+
+  await sendTextMessage({
+    to: TELEFONE_RECEPCAO,
+    message: msgRecepcao,
+    phoneNumberId: company.phone_number_id,
+    whatsappToken: company.whatsapp_token
+  });
+
+  console.log("📞 Alerta de atendimento humano enviado para recepção:", customerPhone);
 }
 
 async function processarRespostaProfissional({ company, customerPhone, provider, resposta }) {
@@ -347,11 +376,7 @@ async function processarEscolhaHorario({ company, customerPhone, customerMessage
   if (profissionalFavorita && escolha.providerName.toLowerCase() !== profissionalFavorita.toLowerCase()) {
     const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente tem como profissional favorita a " + profissionalFavorita + ", mas o horario escolhido (" + escolha.horario + " em " + diaLabel + ") é com a " + escolha.providerName + ". Pergunte de forma natural se ele confirma o agendamento com a " + escolha.providerName + " ou se prefere outro horario com a " + profissionalFavorita + "." }] });
     await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
-    await setConversationState({
-      companyId: company.id, customerPhone,
-      step: STEP_CONFIRMAR_PROFISSIONAL,
-      context: { ...estado.context, escolha, customerName }
-    });
+    await setConversationState({ companyId: company.id, customerPhone, step: STEP_CONFIRMAR_PROFISSIONAL, context: { ...estado.context, escolha, customerName } });
     return;
   }
 
@@ -387,7 +412,7 @@ async function processarConfirmacaoProfissional({ company, customerPhone, custom
 async function finalizarAgendamento({ company, customerPhone, escolha, serviceId, serviceName, diaLabel, customerName, systemPrompt }) {
   const vinculoValido = await validarVinculoProfissionalServico(escolha.providerId, serviceId);
   if (!vinculoValido) {
-    console.error("🚨 BLOQUEIO FINAL: tentativa de gravar agendamento inválido — " + escolha.providerName + " não faz " + serviceName);
+    console.error("🚨 BLOQUEIO FINAL: " + escolha.providerName + " não faz " + serviceName);
     await sendTextMessage({ to: customerPhone, message: "Desculpe, houve um problema ao confirmar seu agendamento. Por favor, escolha novamente o horário e a profissional.", phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
     return;
   }
