@@ -10,7 +10,7 @@ import { getConversationState, setConversationState, clearConversationState } fr
 import { getOrCreateLead, advanceStage } from "../crm/crmService.js";
 import { montarMemoriaCliente, salvarNomeCliente } from "../flows/memoriaCliente.js";
 import { supabase } from "../services/supabase.js";
-import { isAdmin, enviarRelatorioAdmin, isProvider, enviarAgendaProfissional } from "../flows/admin.js";
+import { isAdmin, enviarRelatorioAdmin, isProvider, enviarAgendaProfissional, iniciarCancelamentoAdmin, processarCancelamentoAdmin } from "../flows/admin.js";
 import { iniciarReagendamento, processarReagendamento } from "../modules/reagendamento.js";
 import { oferecerListaEspera, processarRespostaListaEspera, notificarListaEspera } from "../modules/listaEspera.js";
 import { processarAvaliacao } from "../modules/avaliacao.js";
@@ -62,6 +62,16 @@ export async function handleMessage({ company, incomingMessage }) {
     }
   }
 
+  // Comando CANCELAR [nome] — só para admins
+  if (msgUpper.startsWith("CANCELAR ")) {
+    const admin = await isAdmin({ companyId: company.id, customerPhone });
+    if (admin) {
+      const nomeProfissional = customerMessage.trim().substring(9).trim();
+      await iniciarCancelamentoAdmin({ company, customerPhone, nomeProfissional });
+      return;
+    }
+  }
+
   if (msgUpper === "AGENDA") {
     const provider = await isProvider({ companyId: company.id, customerPhone });
     if (provider) {
@@ -95,6 +105,15 @@ export async function handleMessage({ company, incomingMessage }) {
   if (lead?.id) {
     analisarSentimento({ company, customerPhone, customerName: lead?.name || null, mensagens: [customerMessage] }).catch(console.error);
     extrairEsalvarMemoria({ companyId: company.id, customerPhone, customerMessage, leadId: lead.id }).catch(console.error);
+  }
+
+  // Estado de cancelamento admin
+  if (estado && estado.step === "admin_cancelar") {
+    const admin = await isAdmin({ companyId: company.id, customerPhone });
+    if (admin) {
+      await processarCancelamentoAdmin({ company, customerPhone, customerMessage });
+      return;
+    }
   }
 
   if (estado && estado.step === STEP_COLETAR_NOME) {
@@ -204,11 +223,9 @@ export async function handleMessage({ company, incomingMessage }) {
 }
 
 async function direcionarRecepcao({ company, customerPhone, customerMessage, systemPrompt, lead, motivo }) {
-  // Avisa o cliente
   const msg = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: "O cliente precisa de atendimento especializado. Informe de forma calorosa que nossa equipe vai entrar em contato em breve para resolver. Seja breve e acolhedora." }] });
   await sendTextMessage({ to: customerPhone, message: msg, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
 
-  // Busca histórico pelo lead_id
   let historico = "Sem histórico disponível";
   if (lead?.id) {
     const { data: interacoes } = await supabase
@@ -245,8 +262,6 @@ async function direcionarRecepcao({ company, customerPhone, customerMessage, sys
     phoneNumberId: company.phone_number_id,
     whatsappToken: company.whatsapp_token
   });
-
-  console.log("📞 Alerta de atendimento humano enviado para recepção:", customerPhone);
 }
 
 async function processarRespostaProfissional({ company, customerPhone, provider, resposta }) {
