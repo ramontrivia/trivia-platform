@@ -5,6 +5,7 @@ import OpenAI from "openai";
 import { handleIncomingMessage } from "./core/orchestrator.js";
 import { enviarLembretes } from "./modules/lembrete.js";
 import { enviarPedidosAvaliacao } from "./modules/avaliacao.js";
+import { reativarClientesInativos } from "./modules/reativacao.js";
 
 const app = express();
 app.use(express.json());
@@ -136,6 +137,24 @@ app.post("/avaliacao", async (req, res) => {
     res.status(200).json(resultado);
   } catch (error) {
     console.error("Erro no endpoint /avaliacao:", error.message);
+    res.status(500).json({ erro: error.message });
+  }
+});
+
+// -------------------------------------------------------
+// POST /reativacao — disparado pelo N8N toda segunda-feira
+// -------------------------------------------------------
+app.post("/reativacao", async (req, res) => {
+  try {
+    const token = req.headers["x-trivia-token"];
+    if (token !== process.env.VERIFY_TOKEN) {
+      return res.status(401).json({ erro: "Token inválido" });
+    }
+    console.log("🔄 Endpoint /reativacao chamado pelo N8N");
+    const resultado = await reativarClientesInativos();
+    res.status(200).json(resultado);
+  } catch (error) {
+    console.error("Erro no endpoint /reativacao:", error.message);
     res.status(500).json({ erro: error.message });
   }
 });
