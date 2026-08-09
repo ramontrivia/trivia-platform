@@ -1,214 +1,161 @@
 ==================================================
-TRÍVIA — BASE TÉCNICA OFICIAL
+TRÍVIA — CATÁLOGO DE SERVIÇOS
+O QUE A TRÍVIA ENTREGA, NA PRÁTICA
 ==================================================
 
-[CATEGORIA DO SISTEMA]
+Este documento existe para a MEL saber responder com riqueza
+quando perguntarem "o que vocês fazem?".
 
-Tipo: Sistema de atendimento inteligente via WhatsApp
-Arquitetura: Webhook + Processamento de IA + Integração API Oficial Meta
-Canal principal: WhatsApp Business API (Cloud API)
-Modelo: SaaS modular escalável
-
-==================================================
-
-[ARQUITETURA GERAL]
-
-A TRÍVIA opera em 4 camadas principais:
-
-1) Camada de Entrada (Webhook)
-- Recebe mensagens do WhatsApp via API oficial da Meta.
-- Captura texto, áudio, mídia e metadados.
-- Identifica número do cliente.
-- Registra timestamp da interação.
-
-2) Camada de Processamento
-- Interpreta intenção da mensagem.
-- Classifica tipo de solicitação.
-- Consulta base de conhecimento (knowledge/*.txt).
-- Aplica persona e regras comportamentais.
-- Decide próximo passo do fluxo.
-
-3) Camada de Inteligência
-- Processamento via modelo de linguagem.
-- Resposta humanizada.
-- Aplicação de contexto.
-- Aplicação de regras de segurança.
-- Validação de escopo temático.
-
-4) Camada de Saída
-- Envio de resposta via Graph API.
-- Registro interno.
-- Acionamento de lead quando aplicável.
+Ela NUNCA despeja a lista inteira.
+Ela escolhe o que faz sentido para aquela pessoa.
 
 ==================================================
-
-[MODELO OPERACIONAL]
-
-A TRÍVIA trabalha com:
-
-- Atendimento orientado a intenção.
-- Coleta estruturada de dados.
-- Encaminhamento estratégico.
-- Organização conversacional.
-
-Fluxo base:
-
-Mensagem recebida
-↓
-Identificação de intenção
-↓
-Consulta base institucional + técnica
-↓
-Aplicação de persona
-↓
-Geração de resposta
-↓
-Validação de lead
-↓
-Encaminhamento (se necessário)
-
+FRENTE 1 — INTELIGÊNCIA ARTIFICIAL APLICADA
 ==================================================
 
-[ESTRUTURA DE FLUXOS]
+--- AGENTES DE IA / FUNCIONÁRIOS DIGITAIS ---
+Um funcionário que não dorme, não falta e não esquece.
+Atende, responde dúvida, capta contato, organiza pedido,
+agenda, faz triagem e passa o caso pronto pra equipe.
 
-Tipos de fluxo configuráveis:
+Como falar disso:
+"É tipo o que você tá vivendo agora nesta conversa — só que
+com a cara, as informações e as regras da sua empresa."
 
-- Fluxo de recepção
-- Fluxo de agendamento
-- Fluxo de orçamento
-- Fluxo de pedidos
-- Fluxo de qualificação
-- Fluxo de transferência para humano
+Para quem: qualquer negócio que atende cliente.
 
-Cada fluxo contém:
+--- AUTOMAÇÃO DE PROCESSOS ---
+Tirar da mão o que é repetitivo: preenchimento, conferência,
+cálculo, envio de relatório, follow-up, lembrete.
 
-- Perguntas estratégicas
-- Campos obrigatórios
-- Campos opcionais
-- Regras de saída
-- Critérios de lead
+Como falar disso:
+"Aquela tarefa que alguém faz toda semana na mão? A gente
+ensina o sistema a fazer sozinho."
 
-==================================================
-
-[CAPTURA DE DADOS]
-
-Dados estruturáveis:
-
-- Nome do cliente
-- Nome da empresa
-- Cidade/UF
-- Segmento
-- Interesse
-- Dor principal
-- Urgência
-- Histórico de mensagens
-- Data/hora
-- Canal
-
-Esses dados podem ser utilizados para:
-
-- Relatórios
-- Notificação de lead
-- CRM futuro
-- Segmentação
+--- INTEGRAÇÃO ENTRE SISTEMAS ---
+Fazer conversar o que hoje não conversa: agenda, planilha,
+sistema de venda, WhatsApp.
 
 ==================================================
-
-[MECANISMO DE LEAD]
-
-Critérios de geração de lead:
-
-- Intenção de contratação
-- Solicitação de valores
-- Pedido de contato comercial
-- Demonstração de urgência
-
-Quando acionado:
-
-1) Confirma dados essenciais
-2) Envia número comercial automaticamente
-3) Dispara notificação interna com resumo estruturado
-
-Formato da notificação:
-
-NOVO LEAD TRÍVIA
-Empresa:
-Cidade:
-Segmento:
-Interesse:
-Resumo:
-Telefone:
-Data/Hora:
-
+FRENTE 2 — CONTROLE E GESTÃO
 ==================================================
 
-[SEGURANÇA E RESTRIÇÕES]
+--- FLUXO DE CAIXA ---
+Entrada, saída, previsão. Saber quanto tem, quanto vem e
+quanto vai sair — sem depender da memória de ninguém.
 
-A TRÍVIA não pode:
+Como falar disso:
+"Dá pra abrir e ver como tá o caixa hoje, e o que vem
+chegando. Sem caçar papel, sem perguntar pra ninguém."
 
-- Inventar contatos.
-- Inventar e-mails.
-- Inventar preços.
-- Enviar dados técnicos internos.
-- Expor token, servidor ou estrutura.
-- Sair do escopo do negócio.
+--- CONTROLE DE ESTOQUE E ALMOXARIFADO ---
+Saber o que tem, o que está acabando, o que gira e o que
+está parado ocupando dinheiro.
 
-Se cliente solicitar assunto fora do nicho:
-- Responder educadamente.
-- Redirecionar para tema atendimento/tecnologia.
+Como falar disso:
+"Estoque parado é dinheiro dormindo. A gente organiza pra
+você enxergar o que gira e o que só ocupa espaço."
 
-==================================================
+--- PAINÉIS E DASHBOARDS ---
+Painel visual com os indicadores que importam, alimentado
+com os dados reais da operação.
 
-[ESCALABILIDADE]
+Para quem: quem já tem volume e decide no achismo.
 
-Modelo preparado para:
+--- RELATÓRIOS GERENCIAIS ---
+Relatório periódico com leitura do que aconteceu e onde
+está o gargalo.
 
-- Múltiplos clientes.
-- Múltiplos números.
-- Segmentação por negócio.
-- Configuração personalizada por empresa.
-- Modularização de recursos.
-
-Cada cliente pode ter:
-
-- Fluxo exclusivo.
-- Persona ajustada.
-- Serviços ativados conforme plano.
+--- AUTOMAÇÃO DE PLANILHA ---
+Planilha que se preenche e se atualiza sozinha.
 
 ==================================================
-
-[INTEGRAÇÕES FUTURAS POSSÍVEIS]
-
-- CRM
-- Google Agenda
-- Sistemas internos
-- ERP
-- Plataformas de pagamento
-- Dashboard analítico
-
+FRENTE 3 — MARKETING DIGITAL
 ==================================================
 
-[MODELO DE RESPOSTA INTELIGENTE]
+--- GESTÃO DE TRÁFEGO PAGO ---
+Anúncio que traz cliente, não curtida. Segmentação,
+acompanhamento e ajuste com base em número.
 
-A TRÍVIA utiliza:
+Como falar disso:
+"A gente não corre atrás de curtida. Corre atrás de cliente
+entrando em contato."
 
-- Linguagem natural.
-- Contexto acumulado.
-- Base institucional.
-- Base técnica.
-- Persona definida.
-- Regras de fluxo.
-- Regras de conversão.
+--- GESTÃO DE REDES SOCIAIS ---
+Calendário, criação de post, design, legenda, publicação
+e acompanhamento.
+
+Como falar disso:
+"A gente cuida de ponta a ponta: pensa o que postar, cria a
+arte, escreve e publica. Você não precisa lembrar de nada."
+
+--- IDENTIDADE VISUAL ---
+Logo, paleta, tipografia, manual de aplicação. Marca
+coerente do cartão à fachada.
+
+--- MATERIAL IMPRESSO ---
+Cartão de visita, panfleto, folder, banner, faixa, fachada,
+cardápio, papelaria, adesivo de vitrine, uniforme, placa.
+
+Como falar disso:
+"Impresso a gente não abandonou não. Cartão, fachada,
+cardápio — tudo no mesmo padrão do digital."
+
+--- SITE E LANDING PAGE ---
+Site institucional, página de campanha, página de captação.
+Rápido no celular e feito pra converter.
 
 ==================================================
+FRENTE 4 — PRODUÇÃO AUDIOVISUAL
+==================================================
 
-[OBJETIVO TÉCNICO PRINCIPAL]
+--- FILMAGEM PROFISSIONAL ---
+Vídeo institucional, vídeo de produto, bastidor, depoimento
+de cliente, cobertura de evento.
 
-Organizar.
-Padronizar.
-Escalar.
-Converter.
-Sem perder humanização.
+--- VOO DE DRONE ---
+Imagem aérea da obra, da fazenda, do empreendimento, da loja.
+Muda completamente a percepção de porte da empresa.
+
+Como falar disso:
+"Imagem aérea muda tudo. A empresa parece do tamanho que ela
+realmente é."
+
+--- CONTEÚDO E MODELAGEM 3D ---
+Maquete eletrônica, produto em 3D, animação, projeto ainda
+não construído mostrado como se já existisse.
+
+Para quem: construtora, imobiliária, indústria, produto novo.
+
+--- FOTOGRAFIA E PÓS-PRODUÇÃO ---
+Foto de produto, ambiente, equipe. Edição e finalização.
+
+==================================================
+COMO A MEL USA ESTE CATÁLOGO
+==================================================
+
+REGRA 1 — Nunca listar tudo. Escolher o que serve.
+REGRA 2 — Falar em resultado, nunca em ferramenta.
+REGRA 3 — Nunca explicar como funciona por dentro.
+REGRA 4 — Nunca citar nome de tecnologia, sistema ou IA.
+REGRA 5 — Quando souber o ramo da pessoa, conectar na hora
+          com o que faz sentido pra aquele ramo.
+
+CONEXÕES RÁPIDAS POR RAMO:
+
+Restaurante   → cardápio, redes, tráfego, foto de prato,
+                controle de estoque e caixa
+Salão         → identidade, agendamento automático, redes,
+                lembrete de horário
+Construtora   → drone, 3D da obra, site, controle de material
+                e almoxarifado
+Loja          → fachada, tráfego, campanha, controle de estoque
+Clínica       → papelaria, agendamento, funcionário digital,
+                relatório mensal
+Indústria     → dashboard, indicadores, automação de planilha,
+                almoxarifado, vídeo institucional
+Agro          → drone, controle de insumo, relatório
+Imobiliária   → 3D, filmagem, drone, tráfego, CRM
 
 ==================================================
 FIM DO DOCUMENTO
