@@ -1,248 +1,118 @@
 ============================================================
-TRÍVIA — ARQUITETURA TÉCNICO-COMERCIAL ESTRATÉGICA
-Modelo Estrutural de Entrega, Monetização e Escala
+TRÍVIA — MODELO DE ENTREGA E ATUAÇÃO
 ============================================================
 
-[VISÃO GERAL DA ARQUITETURA]
+[COMO A TRÍVIA TRABALHA]
 
-A TRÍVIA não é um produto isolado.
-É uma estrutura operacional aplicada ao WhatsApp.
+A TRÍVIA não vende produto de prateleira.
+Cada projeto é diagnosticado e montado sobre a realidade
+daquela empresa.
 
-Ela funciona como um sistema modular de organização,
-qualificação e conversão de atendimento digital.
+Etapas de entrega:
 
-Sua arquitetura foi desenhada para:
+1. Diagnóstico da operação atual
+2. Identificação do gargalo real
+3. Definição do escopo
+4. Execução
+5. Ajuste com o cliente
+6. Acompanhamento
 
-• Estruturar comunicação
-• Reduzir ruído
-• Padronizar processos
-• Identificar oportunidades
-• Escalar atendimento
-• Integrar operação e comercial
-
-============================================================
-
-[ARQUITETURA EM CAMADAS]
-
-A TRÍVIA opera em 5 camadas estruturais:
-
-────────────────────────────────────
-CAMADA 1 — EXPERIÊNCIA (Interface)
-────────────────────────────────────
-
-Responsável pela percepção do cliente.
-
-• Linguagem humanizada (Persona Mel)
-• Organização visual da conversa
-• Ritmo conversacional
-• Micro validações psicológicas
-• Direcionamento natural
-
-Objetivo:
-Gerar confiança.
-Reduzir resistência.
-Criar fluidez.
-
-────────────────────────────────────
-CAMADA 2 — ESTRUTURA OPERACIONAL
-────────────────────────────────────
-
-Responsável pela organização do atendimento.
-
-• Identificação de intenção
-• Coleta estruturada de dados
-• Classificação de tipo de solicitação
-• Organização de etapas
-• Registro de histórico
-
-Objetivo:
-Eliminar improviso.
-Padronizar atendimento.
-Reduzir erro humano.
-
-────────────────────────────────────
-CAMADA 3 — AUTOMAÇÃO FUNCIONAL
-────────────────────────────────────
-
-Responsável pela execução prática.
-
-• Agendamento inteligente
-• Pedido estruturado
-• Orçamento guiado
-• Confirmações automáticas
-• Respostas organizadas
-
-Objetivo:
-Reduzir tempo.
-Aumentar precisão.
-Evitar retrabalho.
-
-────────────────────────────────────
-CAMADA 4 — INTELIGÊNCIA COMERCIAL
-────────────────────────────────────
-
-Responsável pela geração de receita.
-
-• Identificação de lead quente
-• Classificação por nível de interesse
-• Mapeamento de dor principal
-• Validação de urgência
-• Encaminhamento estratégico
-• Notificação estruturada interna
-
-Objetivo:
-Transformar conversa em oportunidade.
-
-────────────────────────────────────
-CAMADA 5 — EXPANSÃO E ESCALA
-────────────────────────────────────
-
-Responsável pela evolução do cliente.
-
-• Relatórios analíticos
-• Segmentação por perfil
-• Integração com CRM
-• Integração com agenda
-• Integração com sistemas internos
-• Escala multiunidade
-• Personalização por segmento
-
-Objetivo:
-Transformar organização em crescimento sustentável.
+Não é entrega genérica. É estrutura adaptada.
 
 ============================================================
 
-[MODELO DE ENTREGA AO CLIENTE]
-
-A TRÍVIA é implementada de forma consultiva.
-
-Etapas:
-
-1. Diagnóstico do fluxo atual.
-2. Identificação de gargalos.
-3. Definição de módulos necessários.
-4. Configuração personalizada.
-5. Ajuste de linguagem e tom.
-6. Ativação operacional.
-7. Monitoramento e refinamento.
-
-Não é entrega genérica.
-É estrutura adaptada.
-
-============================================================
-
-[MODELO DE PLANOS ESTRATÉGICOS]
-
-A monetização da TRÍVIA é modular.
+[AS QUATRO FRENTES E O QUE CADA UMA RESOLVE]
 
 ────────────────────────────────────
-Plano Estrutura
+IA E FUNCIONÁRIOS DIGITAIS
 ────────────────────────────────────
-• Atendimento humanizado
-• Organização básica de conversa
-• Identificação de intenção
-• Direcionamento inicial
+Resolve: falta de braço, tarefa repetitiva, cliente sem
+resposta, processo que depende de alguém lembrar.
 
-Indicado para:
-Negócios iniciando organização.
+Entrega: agentes de atendimento e venda, funcionário digital
+sob medida, automação de processo, integração entre sistemas.
 
-────────────────────────────────────
-Plano Operacional
-────────────────────────────────────
-Inclui:
-• Plano Estrutura +
-• Agendamento OU Pedidos
-• Coleta estruturada
-• Confirmações automatizadas
-
-Indicado para:
-Empresas com volume médio.
+Resultado percebido: a empresa funciona sem depender de
+presença humana o tempo todo.
 
 ────────────────────────────────────
-Plano Performance
+CONTROLE E GESTÃO
 ────────────────────────────────────
-Inclui:
-• Operacional +
-• Orçamento estruturado
-• Classificação de lead
-• Notificação automática
-• Organização comercial
+Resolve: decidir no achismo, não saber o número, caixa
+desorganizado, estoque e almoxarifado sem controle,
+planilha preenchida na mão.
 
-Indicado para:
-Empresas que dependem de conversão ativa.
+Entrega: fluxo de caixa, controle de estoque e almoxarifado,
+painéis de indicadores, relatórios gerenciais, automação
+de planilha e processo.
+
+Resultado percebido: o dono abre uma tela e enxerga o
+negócio inteiro.
 
 ────────────────────────────────────
-Plano Master
+MARKETING DIGITAL
 ────────────────────────────────────
-Inclui:
-• Todos os módulos
-• Fluxos personalizados
-• Estratégia comercial integrada
-• Ajustes por segmento
-• Preparação para CRM
+Resolve: não aparecer, marca fraca, anúncio que não traz
+cliente, presença digital abandonada.
 
-Indicado para:
-Negócios que desejam escalar.
+Entrega: gestão de tráfego pago, redes sociais, identidade
+visual, material impresso, site e landing page, presença
+no Google.
+
+Resultado percebido: a empresa aparece do tamanho que é —
+e o telefone toca.
+
+────────────────────────────────────
+PRODUÇÃO AUDIOVISUAL
+────────────────────────────────────
+Resolve: dificuldade de mostrar o que se faz, material
+visual amador, projeto que ainda não existe fisicamente.
+
+Entrega: filmagem profissional, voo de drone, conteúdo e
+modelagem 3D, fotografia, pós-produção.
+
+Resultado percebido: percepção de porte e credibilidade
+muda na hora.
 
 ============================================================
 
 [VALOR PERCEBIDO PELO CLIENTE]
 
-A TRÍVIA entrega:
+• Menos tempo gasto com tarefa repetitiva
+• Controle real sobre número, caixa e estoque
+• Decisão com dado, não com sensação
+• Imagem profissional coerente em tudo
+• Um fornecedor só, em vez de cinco
+• Tecnologia de indústria aplicada ao porte dele
 
-• Redução de tempo operacional
-• Organização clara do atendimento
-• Menos retrabalho
-• Menos perda de mensagens
-• Mais profissionalismo
-• Maior taxa de conversão
-• Redução de sobrecarga mental
-• Clareza comercial
-
-Ela não vende automação.
-Ela vende organização estratégica.
+A TRÍVIA não vende ferramenta.
+Vende inteligência aplicada.
 
 ============================================================
 
-[MODELO DE VENDA DA TRÍVIA]
+[MODELO DE VENDA]
 
-A TRÍVIA não é vendida por preço.
-Ela é vendida por clareza.
+A TRÍVIA não é vendida por preço. É vendida por clareza.
 
-Pilares de venda:
+Pilares:
+• Diagnóstico da dor real
+• Demonstração prática
+• Visualização do cenário atual
+• Visualização do cenário organizado
+• Segurança na decisão
 
-• Diagnóstico da dor real.
-• Demonstração prática.
-• Visualização do caos atual.
-• Visualização da organização futura.
-• Segurança na decisão.
-
-Venda não é pressão.
-É condução.
-
-============================================================
-
-[ESTRATÉGIA DE CONVERSÃO OPERACIONAL]
-
-Passo 1 — Identificar dor invisível.
-Passo 2 — Validar impacto da desorganização.
-Passo 3 — Simular solução aplicada.
-Passo 4 — Criar cenário mental positivo.
-Passo 5 — Convidar para próximo passo.
-Passo 6 — Encaminhar com elegância.
+Venda não é pressão. É condução.
 
 ============================================================
 
 [POSICIONAMENTO FINAL]
 
 A TRÍVIA não substitui pessoas.
-Ela estrutura pessoas.
+Ela tira das pessoas o que máquina faz melhor,
+e devolve tempo pro que só gente faz.
 
-Não elimina atendimento humano.
-Ela prepara o terreno.
-
-Não automatiza por automatizar.
-Ela organiza para crescer.
+Do fluxo de caixa ao voo de drone.
+Uma agência fora da curva.
 
 ============================================================
 FIM DO DOCUMENTO
