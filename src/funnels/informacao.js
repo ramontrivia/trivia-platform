@@ -1,7 +1,7 @@
-﻿import { generateResponse } from "../services/openai.js";
+import { generateResponse } from "../services/openai.js";
 import { sendTextMessage } from "../services/whatsapp.js";
 import { loadKnowledge, loadKnowledgePhase } from "../services/knowledge.js";
-import { getOrCreateLead } from "../crm/crmService.js";
+import { getOrCreateLead, saveAiResponse } from "../crm/crmService.js";
 import { montarMemoriaCliente } from "../flows/memoriaCliente.js";
 
 export async function handleMessage({ company, incomingMessage }) {
@@ -16,5 +16,6 @@ export async function handleMessage({ company, incomingMessage }) {
   const resposta = await generateResponse({ systemPrompt, conversationHistory: [{ role: "user", content: customerMessage }] });
   if (resposta) {
     await sendTextMessage({ to: customerPhone, message: resposta, phoneNumberId: company.phone_number_id, whatsappToken: company.whatsapp_token });
+    await saveAiResponse({ leadId: lead?.id, response: resposta });
   }
 }
